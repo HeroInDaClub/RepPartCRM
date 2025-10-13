@@ -8,10 +8,7 @@
   <!-- === НАСТРОЙКИ === -->
   <script>
     const API_URL = 'https://script.google.com/macros/s/AKfycbw8aLams3GM9rRNNAhhVQmWnXIt7sDlzLUsXDsSWh2OVg6_eX8_wD0hFKHsmd0IYsRx/exec';
-    const FUNNEL_COLUMNS = [
-      'Обращение (Лид)','Заказ оформлен','Ожидаем оплату',
-      'На доставке','Отгружен','Помойка'
-    ];
+    const FUNNEL_COLUMNS = ['Обращение (Лид)','Заказ оформлен','Ожидаем оплату','На доставке','Отгружен','Помойка'];
     const OPTIONAL_MANAGER_FIELD = 'Менеджер';
   </script>
 
@@ -19,6 +16,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- SortableJS для плавного DnD -->
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -71,7 +69,8 @@
           <span class="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">Редактирование включено</span>
         </div>
         <div class="flex gap-2 w-full sm:w-auto">
-          <input id="search" placeholder="Поиск по телефону / детали / комментарию" class="px-3 py-2 rounded-lg bg-white border text-slate-900 flex-1 sm:w-80" />
+          <input id="search" placeholder="Поиск по телефону / детали / комментарию"
+                 class="px-3 py-2 rounded-lg bg-white border text-slate-900 flex-1 sm:w-80" />
           <button id="btnAdd" class="px-3 py-2 rounded-lg bg-black text-white">+ Лид</button>
           <button id="btnLogout" class="px-3 py-2 rounded-lg bg-white border">Выйти</button>
         </div>
@@ -79,11 +78,14 @@
 
       <!-- Скелетон при загрузке -->
       <div id="skeleton" class="mb-2">
-        <div class="flex sm:grid sm:grid-cols-3 xl:grid-cols-6 gap-3 overflow-x-auto snap-x snap-mandatory pb-2"></div>
+        <!-- На мобилке вертикально, на десктопе сетка -->
+        <div class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3">
+          <!-- скелетон построим программно -->
+        </div>
       </div>
 
-      <!-- Доска -->
-      <section id="board" class="hidden flex sm:grid sm:grid-cols-3 xl:grid-cols-6 gap-3 overflow-x-auto sm:overflow-visible snap-x snap-mandatory pb-4"></section>
+      <!-- Доска: мобилка — столбцы друг под другом -->
+      <section id="board" class="hidden grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3"></section>
     </div>
   </main>
 
@@ -127,9 +129,10 @@
     const state = { rows: [], token: localStorage.getItem('crm_token')||'', hasManager:false };
 
     function showApp(on){ $('#gate').classList.toggle('hidden', on); $('#app').classList.toggle('hidden', !on); }
-    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;","»":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
     function overlay(on, text){ const o=$('#overlay'); $('#overlayText').textContent=text||'Загрузка…'; o.classList.toggle('hidden', !on); o.classList.toggle('flex', on); }
 
+    // API
     async function api(action, payload = {}) {
       const body = { action, ...payload };
       try {
@@ -139,14 +142,13 @@
       } catch (err) { return { ok:false, error:'network', detail:String(err) }; }
     }
 
-    // ======= Скелетон без template =======
+    // ======= Скелетон =======
     function renderSkeleton() {
-      const wrap = $('#skeleton > div');
-      if (!wrap) return;
+      const wrap = $('#skeleton > div'); if (!wrap) return;
       wrap.innerHTML = '';
-      for (let i=0;i<6;i++){
+      for (let i=0;i<FUNNEL_COLUMNS.length;i++){
         const col = document.createElement('div');
-        col.className = 'min-w-[85vw] sm:min-w-0 sm:flex-1 bg-white border rounded-2xl p-3';
+        col.className = 'bg-white border rounded-2xl p-3';
         col.innerHTML = `
           <div class="h-5 w-40 shimmer mb-3"></div>
           <div class="space-y-3">
@@ -163,7 +165,7 @@
       const board = $('#board'); board.innerHTML = '';
       FUNNEL_COLUMNS.forEach(col => {
         const colBox = document.createElement('div');
-        colBox.className = 'min-w-[85vw] sm:min-w-0 sm:flex-1 bg-white text-slate-900 border rounded-2xl p-3 snap-start';
+        colBox.className = 'bg-white text-slate-900 border rounded-2xl p-3';
         colBox.innerHTML = `
           <div class="flex items-center justify-between mb-2">
             <div class="font-semibold">${col}</div>
@@ -177,7 +179,7 @@
         colBox.querySelector('.count').textContent = items.length;
         board.appendChild(colBox);
       });
-      setupDnD();
+      setupDnD(); // включаем плавное DnD каждый раз после (пере)рендера
     }
 
     function renderCard(row){
@@ -201,27 +203,37 @@
       return card;
     }
 
-    // ======= DnD (SortableJS) =======
+    // ======= DnD (оптимистично) =======
     function setupDnD(){
       $$('.col-drop').forEach(el => {
         new Sortable(el, {
-          group: 'kanban', animation: 150, ghostClass: 'opacity-60', dragClass: 'ring-2 ring-slate-300',
+          group: 'kanban',
+          animation: 180,
+          forceFallback: true,
+          fallbackOnBody: true,
+          fallbackTolerance: 6,
+          ghostClass: 'opacity-60',
+          dragClass: 'ring-2 ring-slate-300',
           onAdd: async (evt) => {
             const card = evt.item;
             const id = card.dataset.id;
             const newStatus = evt.to.dataset.status;
 
+            // локально меняем статус
             const row = state.rows.find(r => String(r.id) === String(id));
             const prevStatus = row ? row['Статус'] : null;
             if (row) row['Статус'] = newStatus;
 
+            // визуальные счётчики
             const oldHeader = evt.from.parentElement.querySelector('.count');
             const newHeader = evt.to.parentElement.querySelector('.count');
             if (oldHeader) oldHeader.textContent = (+oldHeader.textContent - 1);
             if (newHeader) newHeader.textContent = (+newHeader.textContent + 1);
 
+            // сохраняем на сервере
             const res = await api('move', { id, status: newStatus, token: state.token });
             if (!res.ok) {
+              // откат
               if (row) row['Статус'] = prevStatus;
               evt.from.insertBefore(card, evt.from.children[evt.oldDraggableIndex] || null);
               if (oldHeader) oldHeader.textContent = (+oldHeader.textContent + 1);
@@ -321,40 +333,46 @@
       });
     });
 
-    // ======= Вход/Выход =======
+    // ======= Быстрый вход (UI сразу, данные догружаем) =======
     $('#doLogin').onclick = async (ev)=>{
       ev.preventDefault();
       const pwd = $('#pwd').value.trim();
-      $('#gateMsg').classList.add('hidden');
-      if (!pwd){ const el=$('#gateMsg'); el.textContent='Введите пароль'; el.classList.remove('hidden'); return; }
+      const err = $('#gateMsg'); err.classList.add('hidden'); err.textContent='';
+      if (!pwd){ err.textContent='Введите пароль'; err.classList.remove('hidden'); return; }
+
       overlay(true,'Входим…');
       const r = await api('auth', { password: pwd });
       overlay(false);
-      if (!r.ok) { const el=$('#gateMsg'); el.textContent = r.message || r.error || 'Неверный пароль'; el.classList.remove('hidden'); return; }
+
+      if (!r.ok) { err.textContent = r.message || r.error || 'Неверный пароль'; err.classList.remove('hidden'); return; }
+
       state.token = r.token; localStorage.setItem('crm_token', state.token);
-      try { await loadData(); showApp(true); }
-      catch(e){ const el=$('#gateMsg'); el.textContent='Ошибка загрузки: '+e; el.classList.remove('hidden'); }
+
+      // Сразу показываем приложение со скелетонами (не ждём list)
+      showApp(true); renderSkeleton();
+      // Данные дотягиваем асинхронно
+      void loadData();
     };
+
     $('#btnLogout').onclick = ()=>{ state.token=''; localStorage.removeItem('crm_token'); showApp(false); };
 
     // ======= Загрузка данных =======
     async function loadData(){
-      renderSkeleton();
-      $('#skeleton').classList.remove('hidden'); $('#board').classList.add('hidden');
       const res = await api('list', { token: state.token });
-      if (!res.ok) throw (res.message || res.error || 'network');
+      if (!res.ok) { alert('Ошибка загрузки данных'); return; }
       state.rows = res.rows || [];
       state.hasManager = state.rows.some(r => r && Object.prototype.hasOwnProperty.call(r, OPTIONAL_MANAGER_FIELD));
       $('#f_status').innerHTML = FUNNEL_COLUMNS.map(s=>`<option>${s}</option>`).join('');
       renderBoard();
+      // прячем скелетон, показываем доску
       $('#skeleton').classList.add('hidden'); $('#board').classList.remove('hidden');
     }
 
-    // Автовход
+    // Автовход: сразу UI + скелетоны, данные подтянем
     (async function bootstrap(){
       if (state.token) {
-        try { await loadData(); showApp(true); }
-        catch { showApp(false); }
+        showApp(true); renderSkeleton();
+        void loadData();
       } else {
         renderSkeleton();
         showApp(false);
