@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CRM Воронка — Google Sheets</title>
 
-  <!-- === НАСТРОЙКИ ПОД ТЕБЯ === -->
+  <!-- === НАСТРОЙКИ === -->
   <script>
-    // Вставь сюда URL задеплоенного Web App (GAS): https://script.google.com/macros/s/.../exec
+    // URL задеплоенного Web App (GAS), обязательно оканчивается на /exec
     const API_URL = 'https://script.google.com/macros/s/AKfycbw8aLams3GM9rRNNAhhVQmWnXIt7sDlzLUsXDsSWh2OVg6_eX8_wD0hFKHsmd0IYsRx/exec';
 
-    // Колонки воронки (должны ровно совпадать с текстом в столбце "Статус" в таблице)
+    // Колонки воронки (точно как в столбце "Статус")
     const FUNNEL_COLUMNS = [
       'Обращение (Лид)',
       'Заказ оформлен',
@@ -19,12 +19,11 @@
       'Отгружен',
       'Помойка'
     ];
-
-    // Если в таблице есть столбец "Менеджер", появится поле назначения
+    // Необязательный столбец. Если есть — появится поле «Менеджер»
     const OPTIONAL_MANAGER_FIELD = 'Менеджер';
   </script>
 
-  <!-- Tailwind (CDN) -->
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -40,25 +39,25 @@
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
 
-  <!-- === Экран входа (показывается первым) === -->
+  <!-- Логин-экран -->
   <section id="gate" class="min-h-screen flex items-center justify-center p-4">
     <div class="w-full max-w-md bg-white border rounded-2xl shadow-xl p-6">
       <h1 class="text-2xl font-bold mb-1">Вход в CRM</h1>
       <p class="text-sm text-slate-600 mb-4">Введите пароль, чтобы открыть воронку.</p>
       <label class="block text-sm text-slate-600 mb-1">Пароль</label>
-      <input id="pwd" type="password" class="w-full border rounded-lg px-3 py-2 mb-4 bg-white text-slate-900" placeholder="••••••••" />
+      <input id="pwd" type="password" class="w-full border rounded-lg px-3 py-2 mb-3 bg-white text-slate-900" placeholder="••••••••" />
       <button id="doLogin" class="w-full px-3 py-2 rounded-lg bg-black text-white">Войти</button>
-      <div id="gateMsg" class="hidden mt-3 text-sm text-red-600">Неверный пароль</div>
+      <pre id="gateMsg" class="hidden mt-3 text-sm text-red-600 whitespace-pre-wrap"></pre>
     </div>
   </section>
 
-  <!-- === Основное приложение (скрыто до логина) === -->
+  <!-- Приложение (показываем после логина) -->
   <main id="app" class="hidden">
     <div class="max-w-[1400px] mx-auto p-4">
       <header class="flex items-center justify-between gap-4 mb-4">
         <div class="flex items-center gap-3">
           <h2 class="text-2xl font-bold">CRM-воронка</h2>
-          <span id="badgeReadonly" class="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">Редактирование включено</span>
+          <span class="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">Редактирование включено</span>
         </div>
         <div class="flex items-center gap-2">
           <input id="search" placeholder="Поиск по телефону / детали / комментарию" class="px-3 py-2 rounded-lg bg-white border w-80 text-slate-900" />
@@ -67,7 +66,6 @@
         </div>
       </header>
 
-      <!-- Лоадер -->
       <div id="loader" class="hidden flex items-center gap-2 text-slate-600 mb-2">
         <svg width="18" height="18" viewBox="0 0 24 24" class="animate-spin"><path fill="currentColor" d="M12 2a1 1 0 0 1 1 1v2a1 1 0 1 1-2 0V3a1 1 0 0 1 1-1m7.07 3.93a1 1 0 0 1 0 1.41l-1.42 1.42a1 1 0 1 1-1.41-1.41l1.41-1.42a1 1 0 0 1 1.42 0M21 11a1 1 0 0 1 1 1a9.99 9.99 0 0 1-10 10a1 1 0 1 1 0-2a8 8 0 0 0 8-8a1 1 0 0 1 1-1M6.76 5.64a1 1 0 0 1 0 1.41L5.34 8.47a1 1 0 0 1-1.41-1.41l1.41-1.42a1 1 0 0 1 1.42 0"/></svg>
         <span>Загрузка…</span>
@@ -162,46 +160,40 @@
   </dialog>
 
   <script>
-    // ======= helpers =======
-    const $ = (sel,root=document)=>root.querySelector(sel);
+    // ======= helpers / state =======
+    const $  = (sel,root=document)=>root.querySelector(sel);
     const $$ = (sel,root=document)=>Array.from(root.querySelectorAll(sel));
-    const state = {
-      rows: [],
-      token: localStorage.getItem('crm_token') || '',
-      hasManager: false
-    };
+    const state = { rows: [], token: localStorage.getItem('crm_token')||'', hasManager:false };
 
-    function setLoading(on) { $('#loader').classList.toggle('hidden', !on); }
-    function showApp(on) {
-      $('#gate').classList.toggle('hidden', on);
-      $('#app').classList.toggle('hidden', !on);
-    }
+    function setLoading(on){ $('#loader').classList.toggle('hidden', !on); }
+    function showApp(on){ $('#gate').classList.toggle('hidden', on); $('#app').classList.toggle('hidden', !on); }
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
 
+    // Универсальный вызов API: сначала читаем текст, потом пробуем JSON.
     async function api(action, payload = {}) {
       const body = { action, ...payload };
       try {
         const r = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(body),
+          method:'POST',
+          headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+          body: JSON.stringify(body)
         });
-        return await r.json();
+        const txt = await r.text();
+        let data;
+        try { data = JSON.parse(txt); }
+        catch { return { ok:false, error:'bad_json', status:r.status, raw:txt }; }
+        return data;
       } catch (err) {
-        console.error(err);
-        alert('Сеть недоступна или API не отвечает');
-        return { ok: false, error: 'network' };
+        return { ok:false, error:'network', detail:String(err) };
       }
     }
 
-    function renderBoard() {
-      const board = $('#board');
-      board.innerHTML = '';
-
+    function renderBoard(){
+      const board = $('#board'); board.innerHTML = '';
       FUNNEL_COLUMNS.forEach(col => {
         const colBox = document.createElement('div');
-        colBox.className = 'bg-white text-slate-900 border rounded-2xl p-3 flex flex-col h-full';
-
-        const items = state.rows.filter(r => String(r['Статус'] || '').trim() === col);
+        colBox.className = 'bg-white text-slate-900 border rounded-2xl p-3 flex flex-col';
+        const items = state.rows.filter(r => String(r['Статус']||'').trim() === col);
 
         const header = document.createElement('div');
         header.className = 'flex items-center justify-between mb-2';
@@ -211,7 +203,6 @@
         const drop = document.createElement('div');
         drop.className = 'col-drop space-y-2';
         drop.dataset.status = col;
-        drop.dataset.droppable = true;
         drop.ondragover = (e)=>{ e.preventDefault(); drop.classList.add('drop-hover'); };
         drop.ondragleave = ()=> drop.classList.remove('drop-hover');
         drop.ondrop = onDrop;
@@ -222,12 +213,12 @@
       });
     }
 
-    function renderCard(row) {
+    function renderCard(row){
       const card = document.createElement('div');
       card.className = 'card bg-slate-50 text-slate-900 border rounded-lg p-2 cursor-move';
       card.draggable = true;
       card.dataset.id = row.id;
-      card.ondragstart = (e)=>{ e.dataTransfer.setData('text/plain', row.id); };
+      card.ondragstart = (e)=> e.dataTransfer.setData('text/plain', row.id);
 
       const title = (row['Наименование детали']||'').toString();
       const phone = (row['Телефон клиента']||'').toString();
@@ -247,34 +238,21 @@
       return card;
     }
 
-    async function onDrop(e) {
+    async function onDrop(e){
       e.preventDefault();
-      const target = e.currentTarget;
-      target.classList.remove('drop-hover');
-
+      e.currentTarget.classList.remove('drop-hover');
       const id = e.dataTransfer.getData('text/plain');
-      const newStatus = target.dataset.status;
+      const newStatus = e.currentTarget.dataset.status;
       if (!id) return;
-
-      const res = await api('move', { id, status: newStatus, token: state.token });
-      if (!res.ok) {
-        if (res.error === 'unauthorized') return logout('Сессия истекла. Войдите снова.');
-        return alert('Ошибка перемещения');
-      }
-      const idx = state.rows.findIndex(r => String(r.id) === String(id));
-      if (idx >= 0) {
-        state.rows[idx]['Статус'] = newStatus;
-        renderBoard();
-      }
-    }
-
-    function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+      const res = await api('move', { id, status:newStatus, token: state.token });
+      if (!res.ok) return showApiError(res, 'Ошибка перемещения');
+      const idx = state.rows.findIndex(r=>String(r.id)===String(id));
+      if (idx>=0){ state.rows[idx]['Статус'] = newStatus; renderBoard(); }
     }
 
     // ======= Карточка =======
-    function openCard(id) {
-      const row = state.rows.find(r => String(r.id) === String(id));
+    function openCard(id){
+      const row = state.rows.find(r=>String(r.id)===String(id));
       if (!row) return;
 
       $('#f_id').value = row.id || '';
@@ -293,27 +271,21 @@
       $('#f_profit').value = row['Прибыль с заказа'] || '';
       $('#f_comment').value = row['Коментарий'] || '';
 
-      const sel = $('#f_status'); sel.innerHTML = '';
+      const sel = $('#f_status'); sel.innerHTML='';
       FUNNEL_COLUMNS.forEach(s=>{
-        const o = document.createElement('option');
-        o.value = o.textContent = s;
-        if (String(row['Статус']) === s) o.selected = true;
-        sel.appendChild(o);
+        const o = document.createElement('option'); o.value=o.textContent=s;
+        if (String(row['Статус'])===s) o.selected=true; sel.appendChild(o);
       });
 
-      if (state.hasManager) {
-        $('#managerRow').style.display = 'block';
-        $('#f_manager').value = row[OPTIONAL_MANAGER_FIELD] || '';
-      } else {
-        $('#managerRow').style.display = 'none';
-      }
+      if (state.hasManager) { $('#managerRow').style.display='block'; $('#f_manager').value = row[OPTIONAL_MANAGER_FIELD]||''; }
+      else { $('#managerRow').style.display='none'; }
 
       $('#btnSave').disabled = false;
       $('#btnDelete').disabled = false;
       $('#dlgCard').showModal();
     }
 
-    $('#btnSave').onclick = async (ev) => {
+    $('#btnSave').onclick = async (ev)=>{
       ev.preventDefault();
       const id = $('#f_id').value;
       const patch = {
@@ -335,111 +307,105 @@
       };
       if (state.hasManager) patch[OPTIONAL_MANAGER_FIELD] = $('#f_manager').value;
 
-      const res = await api('update', { id, row: patch, token: state.token });
-      if (!res.ok) {
-        if (res.error === 'unauthorized') return logout('Сессия истекла. Войдите снова.');
-        return alert('Ошибка сохранения');
-      }
-      const idx = state.rows.findIndex(r => String(r.id) === String(id));
-      if (idx >= 0) {
-        state.rows[idx] = res.row;
-        renderBoard();
-      }
+      const res = await api('update', { id, row:patch, token: state.token });
+      if (!res.ok) return showApiError(res, 'Ошибка сохранения');
+
+      const idx = state.rows.findIndex(r=>String(r.id)===String(id));
+      if (idx>=0){ state.rows[idx] = res.row; renderBoard(); }
       $('#dlgCard').close();
     };
 
-    // Перенос в «Помойка»
-    $('#btnDelete').onclick = async (ev) => {
+    $('#btnDelete').onclick = async (ev)=>{
       ev.preventDefault();
       const id = $('#f_id').value;
-      const trash = FUNNEL_COLUMNS.includes('Помойка') ? 'Помойка' : FUNNEL_COLUMNS[FUNNEL_COLUMNS.length - 1];
+      const trash = FUNNEL_COLUMNS.includes('Помойка') ? 'Помойка' : FUNNEL_COLUMNS.at(-1);
       if (!confirm('Перенести карточку в «Помойка»?')) return;
-
-      const res = await api('move', { id, status: trash, token: state.token });
-      if (!res.ok) {
-        if (res.error === 'unauthorized') return logout('Сессия истекла. Войдите снова.');
-        return alert('Ошибка операции');
-      }
-      const idx = state.rows.findIndex(r => String(r.id) === String(id));
-      if (idx >= 0) {
-        state.rows[idx]['Статус'] = trash;
-        renderBoard();
-      }
+      const res = await api('move', { id, status:trash, token: state.token });
+      if (!res.ok) return showApiError(res, 'Ошибка операции');
+      const idx = state.rows.findIndex(r=>String(r.id)===String(id));
+      if (idx>=0){ state.rows[idx]['Статус'] = trash; renderBoard(); }
       $('#dlgCard').close();
+    };
+
+    // ======= Новый лид =======
+    $('#btnAdd').onclick = async ()=>{
+      const row = {
+        'п/п':'',
+        'Дата заказа': new Date().toISOString().slice(0,10),
+        'Телефон клиента':'',
+        'Цена,$':'',
+        'Артикул поставщика':'',
+        'Наименование детали':'Новый лид',
+        'Ссылка':'','Касса':'','Продажа':'','Закупка':'','Логисты':'',
+        'Возврат клиенту':'','Возврат от поставщика':'','Прибыль с заказа':'',
+        'Статус': FUNNEL_COLUMNS[0], 'Коментарий':''
+      };
+      if (state.hasManager) row[OPTIONAL_MANAGER_FIELD] = '';
+      const res = await api('create', { row, token: state.token });
+      if (!res.ok) return showApiError(res, 'Ошибка создания');
+      state.rows.unshift(res.row); renderBoard(); openCard(res.row.id);
     };
 
     // ======= Поиск =======
-    $('#search').addEventListener('input', () => {
+    $('#search').addEventListener('input', ()=>{
       const q = $('#search').value.trim().toLowerCase();
-      $$('#board .card').forEach(c => c.classList.remove('hidden'));
+      $$('#board .card').forEach(c=>c.classList.remove('hidden'));
       if (!q) return;
-      state.rows.forEach(r => {
-        const hay = [
-          r['Телефон клиента'],
-          r['Наименование детали'],
-          r['Коментарий']
-        ].map(x => (x || '').toString().toLowerCase()).join(' ');
+      state.rows.forEach(r=>{
+        const hay = [r['Телефон клиента'], r['Наименование детали'], r['Коментарий']]
+          .map(x=>(x||'').toString().toLowerCase()).join(' ');
         const found = hay.includes(q);
-        if (!found) {
-          const el = $(`#board .card[data-id="${CSS.escape(r.id)}"]`);
-          if (el) el.classList.add('hidden');
-        }
+        if (!found){ const el = $(`#board .card[data-id="${CSS.escape(r.id)}"]`); if (el) el.classList.add('hidden'); }
       });
     });
 
-    // ======= Auth / Session =======
-    $('#doLogin').onclick = async (ev) => {
+    // ======= Вход/Выход =======
+    $('#doLogin').onclick = async (ev)=>{
       ev.preventDefault();
       $('#gateMsg').classList.add('hidden');
       const pwd = $('#pwd').value.trim();
-      if (!pwd) { $('#gateMsg').textContent = 'Введите пароль'; $('#gateMsg').classList.remove('hidden'); return; }
-
-      const res = await api('auth', { password: pwd });
-      if (!res.ok) { $('#gateMsg').textContent = 'Неверный пароль'; $('#gateMsg').classList.remove('hidden'); return; }
-      state.token = res.token;
-      localStorage.setItem('crm_token', state.token);
-
-      await loadData();
-      showApp(true);
+      if (!pwd){ showGateMsg('Введите пароль'); return; }
+      const r = await api('auth', { password: pwd });
+      if (!r.ok) { showGateMsg(r.message || r.error || 'Неверный пароль'); return; }
+      state.token = r.token; localStorage.setItem('crm_token', state.token);
+      await loadData(); showApp(true);
     };
 
-    function logout(msg) {
-      state.token = '';
-      localStorage.removeItem('crm_token');
-      if (msg) alert(msg);
-      showApp(false);
+    $('#btnLogout').onclick = ()=>{ state.token=''; localStorage.removeItem('crm_token'); showApp(false); };
+
+    function showGateMsg(msg){ const el = $('#gateMsg'); el.textContent = String(msg||''); el.classList.remove('hidden'); }
+
+    function showApiError(res, fallback){
+      console.log('API error:', res);
+      if (res.error === 'unauthorized'){ state.token=''; localStorage.removeItem('crm_token'); showApp(false); alert('Сессия истекла. Войдите снова.'); return; }
+      if (res.error === 'bad_json'){ alert((fallback||'Ошибка') + '\nСервер вернул не-JSON:\n' + (res.raw||'')); return; }
+      if (res.error === 'network'){ alert('Сеть недоступна или API не отвечает'); return; }
+      alert((fallback||'Ошибка') + (res.message ? (': ' + res.message) : (res.error ? (': ' + res.error) : '')));
     }
 
-    $('#btnLogout').onclick = () => logout();
-
     // ======= Загрузка данных после логина =======
-    async function loadData() {
+    async function loadData(){
       setLoading(true);
-      const res = await api('list', { token: state.token }); // ТРЕБУЕТ ТОКЕН
+      const res = await api('list', { token: state.token }); // list закрыт токеном
       setLoading(false);
-
-      if (!res.ok) {
-        if (res.error === 'unauthorized') return logout('Сессия истекла. Войдите снова.');
-        return alert('Ошибка загрузки данных');
-      }
+      if (!res.ok) return showApiError(res, 'Ошибка загрузки данных');
       state.rows = res.rows || [];
       state.hasManager = state.rows.some(r => r && Object.prototype.hasOwnProperty.call(r, OPTIONAL_MANAGER_FIELD));
       $('#f_status').innerHTML = FUNNEL_COLUMNS.map(s=>`<option>${s}</option>`).join('');
       renderBoard();
     }
 
-    // Если есть токен в localStorage — сразу пытаемся зайти и загрузить
-    (async function bootstrap() {
+    // Автовход, если токен уже есть
+    (async function bootstrap(){
       if (state.token) {
         const res = await api('list', { token: state.token });
         if (res.ok) {
           state.rows = res.rows || [];
           state.hasManager = state.rows.some(r => r && Object.prototype.hasOwnProperty.call(r, OPTIONAL_MANAGER_FIELD));
           $('#f_status').innerHTML = FUNNEL_COLUMNS.map(s=>`<option>${s}</option>`).join('');
-          renderBoard();
-          showApp(true);
+          renderBoard(); showApp(true);
         } else {
-          logout();
+          state.token=''; localStorage.removeItem('crm_token'); showApp(false);
         }
       } else {
         showApp(false);
