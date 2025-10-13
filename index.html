@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CRM Воронка — Google Sheets</title>
+
+  <!-- === НАСТРОЙКИ ПОД ТЕБЯ === -->
+  <script>
+    // Вставь сюда URL задеплоенного Web App (GAS): https://script.google.com/macros/s/.../exec
+    const API_URL = 'https://script.google.com/macros/s/AKfycbw8aLams3GM9rRNNAhhVQmWnXIt7sDlzLUsXDsSWh2OVg6_eX8_wD0hFKHsmd0IYsRx/exec';
+
+    // Колонки воронки (должны ровно совпадать с текстом в столбце "Статус" в таблице)
+    const FUNNEL_COLUMNS = [
+      'Обращение (Лид)',
+      'Заказ оформлен',
+      'Ожидаем оплату',
+      'На доставке',
+      'Отгружен',
+      'Помойка'
+    ];
+
+    // Если в таблице есть столбец "Менеджер", появится поле назначения
+    const OPTIONAL_MANAGER_FIELD = 'Менеджер';
+  </script>
+
+  <!-- Tailwind (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    .col-drop { min-height: 180px; }
+    .card { user-select: none; }
+    .drop-hover { outline: 2px dashed rgba(30,41,59,0.35); outline-offset: 2px; }
+    dialog::backdrop { background: rgba(0,0,0,.35); }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+
+  <!-- === Экран входа (показывается первым) === -->
+  <section id="gate" class="min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white border rounded-2xl shadow-xl p-6">
+      <h1 class="text-2xl font-bold mb-1">Вход в CRM</h1>
+      <p class="text-sm text-slate-600 mb-4">Введите пароль, чтобы открыть воронку.</p>
+      <label class="block text-sm text-slate-600 mb-1">Пароль</label>
+      <input id="pwd" type="password" class="w-full border rounded-lg px-3 py-2 mb-4 bg-white text-slate-900" placeholder="••••••••" />
+      <button id="doLogin" class="w-full px-3 py-2 rounded-lg bg-black text-white">Войти</button>
+      <div id="gateMsg" class="hidden mt-3 text-sm text-red-600">Неверный пароль</div>
+    </div>
+  </section>
+
+  <!-- === Основное приложение (скрыто до логина) === -->
+  <main id="app" class="hidden">
+    <div class="max-w-[1400px] mx-auto p-4">
+      <header class="flex items-center justify-between gap-4 mb-4">
+        <div class="flex items-center gap-3">
+          <h2 class="text-2xl font-bold">CRM-воронка</h2>
+          <span id="badgeReadonly" class="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">Редактирование включено</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <input id="search" placeholder="Поиск по телефону / детали / комментарию" class="px-3 py-2 rounded-lg bg-white border w-80 text-slate-900" />
+          <button id="btnAdd" class="px-3 py-2 rounded-lg bg-black text-white">+ Лид</button>
+          <button id="btnLogout" class="px-3 py-2 rounded-lg bg-white border">Выйти</button>
+        </div>
+      </header>
+
+      <!-- Лоадер -->
+      <div id="loader" class="hidden flex items-center gap-2 text-slate-600 mb-2">
+        <svg width="18" height="18" viewBox="0 0 24 24" class="animate-spin"><path fill="currentColor" d="M12 2a1 1 0 0 1 1 1v2a1 1 0 1 1-2 0V3a1 1 0 0 1 1-1m7.07 3.93a1 1 0 0 1 0 1.41l-1.42 1.42a1 1 0 1 1-1.41-1.41l1.41-1.42a1 1 0 0 1 1.42 0M21 11a1 1 0 0 1 1 1a9.99 9.99 0 0 1-10 10a1 1 0 1 1 0-2a8 8 0 0 0 8-8a1 1 0 0 1 1-1M6.76 5.64a1 1 0 0 1 0 1.41L5.34 8.47a1 1 0 0 1-1.41-1.41l1.41-1.42a1 1 0 0 1 1.42 0"/></svg>
+        <span>Загрузка…</span>
+      </div>
+
+      <section id="board" class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3"></section>
+    </div>
+  </main>
+
+  <!-- Модалка карточки -->
+  <dialog id="dlgCard" class="p-0 rounded-xl w-[760px] max-w-[95vw]">
+    <form method="dialog" class="p-5 bg-white text-slate-900 rounded-xl shadow-xl border">
+      <h3 class="text-lg font-semibold mb-3">Карточка</h3>
+      <div class="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <label class="block text-slate-600">п/п</label>
+          <input id="f_id" class="w-full border rounded px-2 py-1 bg-slate-100" disabled />
+        </div>
+        <div>
+          <label class="block text-slate-600">Дата заказа</label>
+          <input id="f_date" class="w-full border rounded px-2 py-1 bg-white text-slate-900" placeholder="2025-10-13" />
+        </div>
+        <div>
+          <label class="block text-slate-600">Телефон клиента</label>
+          <input id="f_phone" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
+        </div>
+        <div>
+          <label class="block text-slate-600">Цена,$</label>
+          <input id="f_price" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
+        </div>
+        <div class="col-span-2">
+          <label class="block text-slate-600">Наименование детали</label>
+          <input id="f_title" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
+        </div>
+        <div class="col-span-2">
+          <label class="block text-slate-600">Артикул поставщика</label>
+          <input id="f_art" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
+        </div>
+        <div class="col-span-2">
+          <label class="block text-slate-600">Ссылка</label>
+          <input id="f_link" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
+        </div>
+        <div>
+          <label class="block text-slate-600">Продажа</label>
+          <input id="f_sale" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
+        </div>
+        <div>
+          <label class="block text-slate-600">Закупка</label>
+          <input id="f_buy" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
+        </div>
+        <div>
+          <label class="block text-slate-600">Касса</label>
+          <input id="f_cash" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
+        </div>
+        <div>
+          <label class="block text-slate-600">Логисты</label>
+          <input id="f_log" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
+        </div>
+        <div>
+          <label class="block text-slate-600">Возврат клиенту</label>
+          <input id="f_refc" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
+        </div>
+        <div>
+          <label class="block text-slate-600">Возврат от поставщика</label>
+          <input id="f_refp" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
+        </div>
+        <div>
+          <label class="block text-slate-600">Прибыль с заказа</label>
+          <input id="f_profit" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
+        </div>
+        <div>
+          <label class="block text-slate-600">Статус</label>
+          <select id="f_status" class="w-full border rounded px-2 py-1 bg-white text-slate-900"></select>
+        </div>
+        <div class="col-span-2">
+          <label class="block text-slate-600">Коментарий</label>
+          <textarea id="f_comment" class="w-full border rounded px-2 py-1 bg-white text-slate-900" rows="3"></textarea>
+        </div>
+        <div class="col-span-2" id="managerRow" style="display:none">
+          <label class="block text-slate-600">Менеджер</label>
+          <input id="f_manager" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
+        </div>
+      </div>
+      <div class="flex justify-between mt-4">
+        <button id="btnDelete" class="px-3 py-2 rounded-lg border bg-white" value="cancel">Перенести в «Помойка»</button>
+        <div class="flex gap-2">
+          <button class="px-3 py-2 rounded-lg border bg-white" value="cancel">Закрыть</button>
+          <button id="btnSave" class="px-3 py-2 rounded-lg bg-black text-white">Сохранить</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    // ======= helpers =======
+    const $ = (sel,root=document)=>root.querySelector(sel);
+    const $$ = (sel,root=document)=>Array.from(root.querySelectorAll(sel));
+    const state = {
+      rows: [],
+      token: localStorage.getItem('crm_token') || '',
+      hasManager: false
+    };
+
+    function setLoading(on) { $('#loader').classList.toggle('hidden', !on); }
+    function showApp(on) {
+      $('#gate').classList.toggle('hidden', on);
+      $('#app').classList.toggle('hidden', !on);
+    }
+
+    async function api(action, payload = {}) {
+      const body = { action, ...payload };
+      try {
+        const r = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(body),
+        });
+        return await r.json();
+      } catch (err) {
+        console.error(err);
+        alert('Сеть недоступна или API не отвечает');
+        return { ok: false, error: 'network' };
+      }
+    }
+
+    function renderBoard() {
+      const board = $('#board');
+      board.innerHTML = '';
+
+      FUNNEL_COLUMNS.forEach(col => {
+        const colBox = document.createElement('div');
+        colBox.className = 'bg-white text-slate-900 border rounded-2xl p-3 flex flex-col h-full';
+
+        const items = state.rows.filter(r => String(r['Статус'] || '').trim() === col);
+
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between mb-2';
+        header.innerHTML = `<div class="font-semibold">${col}</div><div class="text-xs text-slate-600">${items.length}</div>`;
+        colBox.appendChild(header);
+
+        const drop = document.createElement('div');
+        drop.className = 'col-drop space-y-2';
+        drop.dataset.status = col;
+        drop.dataset.droppable = true;
+        drop.ondragover = (e)=>{ e.preventDefault(); drop.classList.add('drop-hover'); };
+        drop.ondragleave = ()=> drop.classList.remove('drop-hover');
+        drop.ondrop = onDrop;
+
+        items.forEach(row => drop.appendChild(renderCard(row)));
+        colBox.appendChild(drop);
+        board.appendChild(colBox);
+      });
+    }
+
+    function renderCard(row) {
+      const card = document.createElement('div');
+      card.className = 'card bg-slate-50 text-slate-900 border rounded-lg p-2 cursor-move';
+      card.draggable = true;
+      card.dataset.id = row.id;
+      card.ondragstart = (e)=>{ e.dataTransfer.setData('text/plain', row.id); };
+
+      const title = (row['Наименование детали']||'').toString();
+      const phone = (row['Телефон клиента']||'').toString();
+      const price = (row['Цена,$']||'').toString();
+      const manager = state.hasManager ? (row[OPTIONAL_MANAGER_FIELD]||'') : '';
+
+      card.innerHTML = `
+        <div class="flex items-center justify-between gap-2">
+          <div class="text-sm font-semibold line-clamp-2">${escapeHtml(title)}</div>
+          <div class="text-xs text-slate-600">$${escapeHtml(price)}</div>
+        </div>
+        <div class="mt-1 flex items-center justify-between text-xs text-slate-700">
+          <div>${escapeHtml(phone)}</div>
+          ${manager?`<div class="px-2 py-0.5 bg-slate-200 rounded-full">${escapeHtml(manager)}</div>`:''}
+        </div>`;
+      card.onclick = ()=> openCard(row.id);
+      return card;
+    }
+
+    async function onDrop(e) {
+      e.preventDefault();
+      const target = e.currentTarget;
+      target.classList.remove('drop-hover');
+
+      const id = e.dataTransfer.getData('text/plain');
+      const newStatus = target.dataset.status;
+      if (!id) return;
+
+      const res = await api('move', { id, status: newStatus, token: state.token });
+      if (!res.ok) {
+        if (res.error === 'unauthorized') return logout('Сессия истекла. Войдите снова.');
+        return alert('Ошибка перемещения');
+      }
+      const idx = state.rows.findIndex(r => String(r.id) === String(id));
+      if (idx >= 0) {
+        state.rows[idx]['Статус'] = newStatus;
+        renderBoard();
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    }
+
+    // ======= Карточка =======
+    function openCard(id) {
+      const row = state.rows.find(r => String(r.id) === String(id));
+      if (!row) return;
+
+      $('#f_id').value = row.id || '';
+      $('#f_date').value = row['Дата заказа'] || '';
+      $('#f_phone').value = row['Телефон клиента'] || '';
+      $('#f_price').value = row['Цена,$'] || '';
+      $('#f_title').value = row['Наименование детали'] || '';
+      $('#f_art').value = row['Артикул поставщика'] || '';
+      $('#f_link').value = row['Ссылка'] || '';
+      $('#f_sale').value = row['Продажа'] || '';
+      $('#f_buy').value = row['Закупка'] || '';
+      $('#f_cash').value = row['Касса'] || '';
+      $('#f_log').value = row['Логисты'] || '';
+      $('#f_refc').value = row['Возврат клиенту'] || '';
+      $('#f_refp').value = row['Возврат от поставщика'] || '';
+      $('#f_profit').value = row['Прибыль с заказа'] || '';
+      $('#f_comment').value = row['Коментарий'] || '';
+
+      const sel = $('#f_status'); sel.innerHTML = '';
+      FUNNEL_COLUMNS.forEach(s=>{
+        const o = document.createElement('option');
+        o.value = o.textContent = s;
+        if (String(row['Статус']) === s) o.selected = true;
+        sel.appendChild(o);
+      });
+
+      if (state.hasManager) {
+        $('#managerRow').style.display = 'block';
+        $('#f_manager').value = row[OPTIONAL_MANAGER_FIELD] || '';
+      } else {
+        $('#managerRow').style.display = 'none';
+      }
+
+      $('#btnSave').disabled = false;
+      $('#btnDelete').disabled = false;
+      $('#dlgCard').showModal();
+    }
+
+    $('#btnSave').onclick = async (ev) => {
+      ev.preventDefault();
+      const id = $('#f_id').value;
+      const patch = {
+        'Дата заказа': $('#f_date').value,
+        'Телефон клиента': $('#f_phone').value,
+        'Цена,$': $('#f_price').value,
+        'Наименование детали': $('#f_title').value,
+        'Артикул поставщика': $('#f_art').value,
+        'Ссылка': $('#f_link').value,
+        'Продажа': $('#f_sale').value,
+        'Закупка': $('#f_buy').value,
+        'Касса': $('#f_cash').value,
+        'Логисты': $('#f_log').value,
+        'Возврат клиенту': $('#f_refc').value,
+        'Возврат от поставщика': $('#f_refp').value,
+        'Прибыль с заказа': $('#f_profit').value,
+        'Статус': $('#f_status').value,
+        'Коментарий': $('#f_comment').value,
+      };
+      if (state.hasManager) patch[OPTIONAL_MANAGER_FIELD] = $('#f_manager').value;
+
+      const res = await api('update', { id, row: patch, token: state.token });
+      if (!res.ok) {
+        if (res.error === 'unauthorized') return logout('Сессия истекла. Войдите снова.');
+        return alert('Ошибка сохранения');
+      }
+      const idx = state.rows.findIndex(r => String(r.id) === String(id));
+      if (idx >= 0) {
+        state.rows[idx] = res.row;
+        renderBoard();
+      }
+      $('#dlgCard').close();
+    };
+
+    // Перенос в «Помойка»
+    $('#btnDelete').onclick = async (ev) => {
+      ev.preventDefault();
+      const id = $('#f_id').value;
+      const trash = FUNNEL_COLUMNS.includes('Помойка') ? 'Помойка' : FUNNEL_COLUMNS[FUNNEL_COLUMNS.length - 1];
+      if (!confirm('Перенести карточку в «Помойка»?')) return;
+
+      const res = await api('move', { id, status: trash, token: state.token });
+      if (!res.ok) {
+        if (res.error === 'unauthorized') return logout('Сессия истекла. Войдите снова.');
+        return alert('Ошибка операции');
+      }
+      const idx = state.rows.findIndex(r => String(r.id) === String(id));
+      if (idx >= 0) {
+        state.rows[idx]['Статус'] = trash;
+        renderBoard();
+      }
+      $('#dlgCard').close();
+    };
+
+    // ======= Поиск =======
+    $('#search').addEventListener('input', () => {
+      const q = $('#search').value.trim().toLowerCase();
+      $$('#board .card').forEach(c => c.classList.remove('hidden'));
+      if (!q) return;
+      state.rows.forEach(r => {
+        const hay = [
+          r['Телефон клиента'],
+          r['Наименование детали'],
+          r['Коментарий']
+        ].map(x => (x || '').toString().toLowerCase()).join(' ');
+        const found = hay.includes(q);
+        if (!found) {
+          const el = $(`#board .card[data-id="${CSS.escape(r.id)}"]`);
+          if (el) el.classList.add('hidden');
+        }
+      });
+    });
+
+    // ======= Auth / Session =======
+    $('#doLogin').onclick = async (ev) => {
+      ev.preventDefault();
+      $('#gateMsg').classList.add('hidden');
+      const pwd = $('#pwd').value.trim();
+      if (!pwd) { $('#gateMsg').textContent = 'Введите пароль'; $('#gateMsg').classList.remove('hidden'); return; }
+
+      const res = await api('auth', { password: pwd });
+      if (!res.ok) { $('#gateMsg').textContent = 'Неверный пароль'; $('#gateMsg').classList.remove('hidden'); return; }
+      state.token = res.token;
+      localStorage.setItem('crm_token', state.token);
+
+      await loadData();
+      showApp(true);
+    };
+
+    function logout(msg) {
+      state.token = '';
+      localStorage.removeItem('crm_token');
+      if (msg) alert(msg);
+      showApp(false);
+    }
+
+    $('#btnLogout').onclick = () => logout();
+
+    // ======= Загрузка данных после логина =======
+    async function loadData() {
+      setLoading(true);
+      const res = await api('list', { token: state.token }); // ТРЕБУЕТ ТОКЕН
+      setLoading(false);
+
+      if (!res.ok) {
+        if (res.error === 'unauthorized') return logout('Сессия истекла. Войдите снова.');
+        return alert('Ошибка загрузки данных');
+      }
+      state.rows = res.rows || [];
+      state.hasManager = state.rows.some(r => r && Object.prototype.hasOwnProperty.call(r, OPTIONAL_MANAGER_FIELD));
+      $('#f_status').innerHTML = FUNNEL_COLUMNS.map(s=>`<option>${s}</option>`).join('');
+      renderBoard();
+    }
+
+    // Если есть токен в localStorage — сразу пытаемся зайти и загрузить
+    (async function bootstrap() {
+      if (state.token) {
+        const res = await api('list', { token: state.token });
+        if (res.ok) {
+          state.rows = res.rows || [];
+          state.hasManager = state.rows.some(r => r && Object.prototype.hasOwnProperty.call(r, OPTIONAL_MANAGER_FIELD));
+          $('#f_status').innerHTML = FUNNEL_COLUMNS.map(s=>`<option>${s}</option>`).join('');
+          renderBoard();
+          showApp(true);
+        } else {
+          logout();
+        }
+      } else {
+        showApp(false);
+      }
+    })();
+  </script>
+</body>
+</html>
