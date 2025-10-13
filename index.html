@@ -5,149 +5,130 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CRM Воронка — Google Sheets</title>
 
-  <!-- === НАСТРОЙКИ === -->
+  <!-- Настройки (API_URL подставит GAS) -->
   <script>
-    // URL задеплоенного Web App (GAS), обязательно оканчивается на /exec
-    const API_URL = 'https://script.google.com/macros/s/AKfycbw8aLams3GM9rRNNAhhVQmWnXIt7sDlzLUsXDsSWh2OVg6_eX8_wD0hFKHsmd0IYsRx/exec';
-
-    // Колонки воронки (точно как в столбце "Статус")
+    const API_URL = '<?!= API_URL ?>';
     const FUNNEL_COLUMNS = [
-      'Обращение (Лид)',
-      'Заказ оформлен',
-      'Ожидаем оплату',
-      'На доставке',
-      'Отгружен',
-      'Помойка'
+      'Обращение (Лид)','Заказ оформлен','Ожидаем оплату',
+      'На доставке','Отгружен','Помойка'
     ];
-    // Необязательный столбец. Если есть — появится поле «Менеджер»
-    const OPTIONAL_MANAGER_FIELD = 'Менеджер';
+    const OPTIONAL_MANAGER_FIELD = 'Менеджер'; // если есть такой столбец
   </script>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SortableJS для плавного DnD -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
   <style>
     body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    .col-drop { min-height: 180px; }
-    .card { user-select: none; }
-    .drop-hover { outline: 2px dashed rgba(30,41,59,0.35); outline-offset: 2px; }
     dialog::backdrop { background: rgba(0,0,0,.35); }
+    /* Скелетон */
+    .shimmer {
+      position: relative; overflow: hidden; background: #e5e7eb; border-radius: .5rem;
+    }
+    .shimmer::after{
+      content:''; position:absolute; inset:0;
+      transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent);
+      animation: shimmer 1.2s infinite;
+    }
+    @keyframes shimmer { 100% { transform: translateX(100%); } }
+
+    /* Мобилка: диалог на весь экран */
+    @media (max-width: 640px){
+      dialog { width: 100vw !important; max-width: 100vw !important; height: 100vh; border-radius: 0 !important; }
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
 
-  <!-- Логин-экран -->
+  <!-- Оверлей-лоадер -->
+  <div id="overlay" class="fixed inset-0 hidden z-50 items-center justify-center bg-black/30 backdrop-blur-sm">
+    <div class="bg-white rounded-xl shadow-xl px-4 py-3 flex items-center gap-3">
+      <svg width="20" height="20" viewBox="0 0 24 24" class="animate-spin text-slate-700"><path fill="currentColor" d="M12 2a1 1 0 0 1 1 1v2a1 1 0 1 1-2 0V3a1 1 0 0 1 1-1m7.07 3.93a1 1 0 0 1 0 1.41l-1.42 1.42a1 1 0 1 1-1.41-1.41l1.41-1.42a1 1 0 0 1 1.42 0M21 11a1 1 0 0 1 1 1a9.99 9.99 0 0 1-10 10a1 1 0 1 1 0-2a8 8 0 0 0 8-8a1 1 0 0 1 1-1"/></svg>
+      <span id="overlayText" class="text-sm">Загрузка…</span>
+    </div>
+  </div>
+
+  <!-- Логин -->
   <section id="gate" class="min-h-screen flex items-center justify-center p-4">
-    <div class="w-full max-w-md bg-white border rounded-2xl shadow-xl p-6">
+    <div class="w-full max-w-md bg-white border rounded-2xl shadow-xl p-6 animate-[fadeIn_.4s_ease]">
       <h1 class="text-2xl font-bold mb-1">Вход в CRM</h1>
       <p class="text-sm text-slate-600 mb-4">Введите пароль, чтобы открыть воронку.</p>
       <label class="block text-sm text-slate-600 mb-1">Пароль</label>
       <input id="pwd" type="password" class="w-full border rounded-lg px-3 py-2 mb-3 bg-white text-slate-900" placeholder="••••••••" />
-      <button id="doLogin" class="w-full px-3 py-2 rounded-lg bg-black text-white">Войти</button>
+      <button id="doLogin" class="w-full px-3 py-2 rounded-lg bg-black text-white transition active:scale-[.98]">Войти</button>
       <pre id="gateMsg" class="hidden mt-3 text-sm text-red-600 whitespace-pre-wrap"></pre>
     </div>
   </section>
 
-  <!-- Приложение (показываем после логина) -->
+  <!-- Приложение -->
   <main id="app" class="hidden">
     <div class="max-w-[1400px] mx-auto p-4">
-      <header class="flex items-center justify-between gap-4 mb-4">
-        <div class="flex items-center gap-3">
+      <!-- Шапка: на мобиле элементы в 2 строки -->
+      <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+        <div class="flex items-center justify-between sm:justify-start gap-3">
           <h2 class="text-2xl font-bold">CRM-воронка</h2>
-          <span class="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">Редактирование включено</span>
+          <span class="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+            Редактирование включено
+          </span>
         </div>
-        <div class="flex items-center gap-2">
-          <input id="search" placeholder="Поиск по телефону / детали / комментарию" class="px-3 py-2 rounded-lg bg-white border w-80 text-slate-900" />
+        <div class="flex gap-2 w-full sm:w-auto">
+          <input id="search" placeholder="Поиск по телефону / детали / комментарию"
+                 class="px-3 py-2 rounded-lg bg-white border text-slate-900 flex-1 sm:w-80" />
           <button id="btnAdd" class="px-3 py-2 rounded-lg bg-black text-white">+ Лид</button>
           <button id="btnLogout" class="px-3 py-2 rounded-lg bg-white border">Выйти</button>
         </div>
       </header>
 
-      <div id="loader" class="hidden flex items-center gap-2 text-slate-600 mb-2">
-        <svg width="18" height="18" viewBox="0 0 24 24" class="animate-spin"><path fill="currentColor" d="M12 2a1 1 0 0 1 1 1v2a1 1 0 1 1-2 0V3a1 1 0 0 1 1-1m7.07 3.93a1 1 0 0 1 0 1.41l-1.42 1.42a1 1 0 1 1-1.41-1.41l1.41-1.42a1 1 0 0 1 1.42 0M21 11a1 1 0 0 1 1 1a9.99 9.99 0 0 1-10 10a1 1 0 1 1 0-2a8 8 0 0 0 8-8a1 1 0 0 1 1-1M6.76 5.64a1 1 0 0 1 0 1.41L5.34 8.47a1 1 0 0 1-1.41-1.41l1.41-1.42a1 1 0 0 1 1.42 0"/></svg>
-        <span>Загрузка…</span>
+      <!-- Скелетон при первой загрузке -->
+      <div id="skeleton" class="mb-2">
+        <div class="flex sm:grid sm:grid-cols-3 xl:grid-cols-6 gap-3 overflow-x-auto snap-x snap-mandatory pb-2">
+          <!-- 6 placeholder-колонок -->
+          <template id="skCol">
+            <div class="min-w-[85vw] sm:min-w-0 sm:flex-1 bg-white border rounded-2xl p-3">
+              <div class="h-5 w-40 shimmer mb-3"></div>
+              <div class="space-y-3">
+                <div class="h-16 shimmer rounded-lg"></div>
+                <div class="h-16 shimmer rounded-lg"></div>
+                <div class="h-16 shimmer rounded-lg"></div>
+              </div>
+            </div>
+          </template>
+        </div>
       </div>
 
-      <section id="board" class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3"></section>
+      <!-- Доска: на мобиле горизонтальный скролл + snap -->
+      <section id="board" class="hidden flex sm:grid sm:grid-cols-3 xl:grid-cols-6 gap-3 overflow-x-auto sm:overflow-visible snap-x snap-mandatory pb-4"></section>
     </div>
   </main>
 
   <!-- Модалка карточки -->
   <dialog id="dlgCard" class="p-0 rounded-xl w-[760px] max-w-[95vw]">
-    <form method="dialog" class="p-5 bg-white text-slate-900 rounded-xl shadow-xl border">
+    <form method="dialog" class="p-5 bg-white text-slate-900 rounded-xl shadow-xl border animate-[fadeIn_.2s_ease]">
       <h3 class="text-lg font-semibold mb-3">Карточка</h3>
-      <div class="grid grid-cols-2 gap-3 text-sm">
-        <div>
-          <label class="block text-slate-600">п/п</label>
-          <input id="f_id" class="w-full border rounded px-2 py-1 bg-slate-100" disabled />
-        </div>
-        <div>
-          <label class="block text-slate-600">Дата заказа</label>
-          <input id="f_date" class="w-full border rounded px-2 py-1 bg-white text-slate-900" placeholder="2025-10-13" />
-        </div>
-        <div>
-          <label class="block text-slate-600">Телефон клиента</label>
-          <input id="f_phone" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
-        </div>
-        <div>
-          <label class="block text-slate-600">Цена,$</label>
-          <input id="f_price" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
-        </div>
-        <div class="col-span-2">
-          <label class="block text-slate-600">Наименование детали</label>
-          <input id="f_title" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
-        </div>
-        <div class="col-span-2">
-          <label class="block text-slate-600">Артикул поставщика</label>
-          <input id="f_art" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
-        </div>
-        <div class="col-span-2">
-          <label class="block text-slate-600">Ссылка</label>
-          <input id="f_link" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
-        </div>
-        <div>
-          <label class="block text-slate-600">Продажа</label>
-          <input id="f_sale" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
-        </div>
-        <div>
-          <label class="block text-slate-600">Закупка</label>
-          <input id="f_buy" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
-        </div>
-        <div>
-          <label class="block text-slate-600">Касса</label>
-          <input id="f_cash" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
-        </div>
-        <div>
-          <label class="block text-slate-600">Логисты</label>
-          <input id="f_log" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
-        </div>
-        <div>
-          <label class="block text-slate-600">Возврат клиенту</label>
-          <input id="f_refc" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
-        </div>
-        <div>
-          <label class="block text-slate-600">Возврат от поставщика</label>
-          <input id="f_refp" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
-        </div>
-        <div>
-          <label class="block text-slate-600">Прибыль с заказа</label>
-          <input id="f_profit" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
-        </div>
-        <div>
-          <label class="block text-slate-600">Статус</label>
-          <select id="f_status" class="w-full border rounded px-2 py-1 bg-white text-slate-900"></select>
-        </div>
-        <div class="col-span-2">
-          <label class="block text-slate-600">Коментарий</label>
-          <textarea id="f_comment" class="w-full border rounded px-2 py-1 bg-white text-slate-900" rows="3"></textarea>
-        </div>
-        <div class="col-span-2" id="managerRow" style="display:none">
-          <label class="block text-slate-600">Менеджер</label>
-          <input id="f_manager" class="w-full border rounded px-2 py-1 bg-white text-slate-900" />
-        </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+        <div><label class="block text-slate-600">п/п</label><input id="f_id" class="w-full border rounded px-2 py-1 bg-slate-100" disabled /></div>
+        <div><label class="block text-slate-600">Дата заказа</label><input id="f_date" class="w-full border rounded px-2 py-1 bg-white text-slate-900" placeholder="2025-10-13" /></div>
+        <div><label class="block text-slate-600">Телефон клиента</label><input id="f_phone" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
+        <div><label class="block text-slate-600">Цена,$</label><input id="f_price" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
+        <div class="sm:col-span-2"><label class="block text-slate-600">Наименование детали</label><input id="f_title" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
+        <div class="sm:col-span-2"><label class="block text-slate-600">Артикул поставщика</label><input id="f_art" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
+        <div class="sm:col-span-2"><label class="block text-slate-600">Ссылка</label><input id="f_link" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
+        <div><label class="block text-slate-600">Продажа</label><input id="f_sale" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
+        <div><label class="block text-slate-600">Закупка</label><input id="f_buy" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
+        <div><label class="block text-slate-600">Касса</label><input id="f_cash" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
+        <div><label class="block text-slate-600">Логисты</label><input id="f_log" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
+        <div><label class="block text-slate-600">Возврат клиенту</label><input id="f_refc" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
+        <div><label class="block text-slate-600">Возврат от поставщика</label><input id="f_refp" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
+        <div><label class="block text-slate-600">Прибыль с заказа</label><input id="f_profit" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
+        <div><label class="block text-slate-600">Статус</label><select id="f_status" class="w-full border rounded px-2 py-1 bg-white text-slate-900"></select></div>
+        <div class="sm:col-span-2"><label class="block text-slate-600">Коментарий</label><textarea id="f_comment" class="w-full border rounded px-2 py-1 bg-white text-slate-900" rows="3"></textarea></div>
+        <div class="sm:col-span-2" id="managerRow" style="display:none"><label class="block text-slate-600">Менеджер</label><input id="f_manager" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
       </div>
       <div class="flex justify-between mt-4">
         <button id="btnDelete" class="px-3 py-2 rounded-lg border bg-white" value="cancel">Перенести в «Помойка»</button>
@@ -165,60 +146,55 @@
     const $$ = (sel,root=document)=>Array.from(root.querySelectorAll(sel));
     const state = { rows: [], token: localStorage.getItem('crm_token')||'', hasManager:false };
 
-    function setLoading(on){ $('#loader').classList.toggle('hidden', !on); }
     function showApp(on){ $('#gate').classList.toggle('hidden', on); $('#app').classList.toggle('hidden', !on); }
-    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;","»":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+    function overlay(on, text){ const o=$('#overlay'); $('#overlayText').textContent=text||'Загрузка…'; o.classList.toggle('hidden', !on); o.classList.toggle('flex', on); }
 
-    // Универсальный вызов API: сначала читаем текст, потом пробуем JSON.
     async function api(action, payload = {}) {
       const body = { action, ...payload };
-      try {
-        const r = await fetch(API_URL, {
-          method:'POST',
-          headers:{ 'Content-Type':'text/plain;charset=utf-8' },
-          body: JSON.stringify(body)
-        });
-        const txt = await r.text();
-        let data;
-        try { data = JSON.parse(txt); }
-        catch { return { ok:false, error:'bad_json', status:r.status, raw:txt }; }
-        return data;
-      } catch (err) {
-        return { ok:false, error:'network', detail:String(err) };
-      }
+      const r = await fetch(API_URL, {
+        method:'POST',
+        headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+        body: JSON.stringify(body)
+      });
+      const txt = await r.text(); let data;
+      try { data = JSON.parse(txt); } catch { return { ok:false, error:'bad_json', raw:txt }; }
+      return data;
+    }
+
+    // ======= Рендер =======
+    function renderSkeleton() {
+      const host = $('#skeleton > div'); host.innerHTML='';
+      const tpl = $('#skCol').content;
+      for (let i=0;i<6;i++) host.appendChild(tpl.cloneNode(true));
     }
 
     function renderBoard(){
       const board = $('#board'); board.innerHTML = '';
+      // мобилка: горизонтальный скролл, колонки с min-width
       FUNNEL_COLUMNS.forEach(col => {
         const colBox = document.createElement('div');
-        colBox.className = 'bg-white text-slate-900 border rounded-2xl p-3 flex flex-col';
+        colBox.className = 'min-w-[85vw] sm:min-w-0 sm:flex-1 bg-white text-slate-900 border rounded-2xl p-3 snap-start';
+        colBox.innerHTML = `
+          <div class="flex items-center justify-between mb-2">
+            <div class="font-semibold">${col}</div>
+            <div class="text-xs text-slate-600 count">0</div>
+          </div>
+          <div class="col-drop space-y-2" data-status="${col}"></div>
+        `;
+        const drop = colBox.querySelector('.col-drop');
         const items = state.rows.filter(r => String(r['Статус']||'').trim() === col);
-
-        const header = document.createElement('div');
-        header.className = 'flex items-center justify-between mb-2';
-        header.innerHTML = `<div class="font-semibold">${col}</div><div class="text-xs text-slate-600">${items.length}</div>`;
-        colBox.appendChild(header);
-
-        const drop = document.createElement('div');
-        drop.className = 'col-drop space-y-2';
-        drop.dataset.status = col;
-        drop.ondragover = (e)=>{ e.preventDefault(); drop.classList.add('drop-hover'); };
-        drop.ondragleave = ()=> drop.classList.remove('drop-hover');
-        drop.ondrop = onDrop;
-
         items.forEach(row => drop.appendChild(renderCard(row)));
-        colBox.appendChild(drop);
+        colBox.querySelector('.count').textContent = items.length;
         board.appendChild(colBox);
       });
+      setupDnD();
     }
 
     function renderCard(row){
       const card = document.createElement('div');
-      card.className = 'card bg-slate-50 text-slate-900 border rounded-lg p-2 cursor-move';
-      card.draggable = true;
+      card.className = 'card bg-slate-50 text-slate-900 border rounded-lg p-2 cursor-move transition hover:shadow-md';
       card.dataset.id = row.id;
-      card.ondragstart = (e)=> e.dataTransfer.setData('text/plain', row.id);
 
       const title = (row['Наименование детали']||'').toString();
       const phone = (row['Телефон клиента']||'').toString();
@@ -234,20 +210,45 @@
           <div>${escapeHtml(phone)}</div>
           ${manager?`<div class="px-2 py-0.5 bg-slate-200 rounded-full">${escapeHtml(manager)}</div>`:''}
         </div>`;
-      card.onclick = ()=> openCard(row.id);
+      card.addEventListener('click', ()=> openCard(row.id));
       return card;
     }
 
-    async function onDrop(e){
-      e.preventDefault();
-      e.currentTarget.classList.remove('drop-hover');
-      const id = e.dataTransfer.getData('text/plain');
-      const newStatus = e.currentTarget.dataset.status;
-      if (!id) return;
-      const res = await api('move', { id, status:newStatus, token: state.token });
-      if (!res.ok) return showApiError(res, 'Ошибка перемещения');
-      const idx = state.rows.findIndex(r=>String(r.id)===String(id));
-      if (idx>=0){ state.rows[idx]['Статус'] = newStatus; renderBoard(); }
+    // ======= DnD на SortableJS =======
+    function setupDnD(){
+      $$('.col-drop').forEach(el => {
+        new Sortable(el, {
+          group: 'kanban',
+          animation: 150,
+          ghostClass: 'opacity-60',
+          dragClass: 'ring-2 ring-slate-300',
+          onAdd: async (evt) => {
+            const card = evt.item;
+            const id = card.dataset.id;
+            const newStatus = evt.to.dataset.status;
+
+            const row = state.rows.find(r => String(r.id) === String(id));
+            const prevStatus = row ? row['Статус'] : null;
+            if (row) row['Статус'] = newStatus;
+
+            // обновим счётчики визуально
+            const oldHeader = evt.from.parentElement.querySelector('.count');
+            const newHeader = evt.to.parentElement.querySelector('.count');
+            if (oldHeader) oldHeader.textContent = (+oldHeader.textContent - 1);
+            if (newHeader) newHeader.textContent = (+newHeader.textContent + 1);
+
+            const res = await api('move', { id, status: newStatus, token: state.token });
+            if (!res.ok) {
+              // откат
+              if (row) row['Статус'] = prevStatus;
+              evt.from.insertBefore(card, evt.from.children[evt.oldDraggableIndex] || null);
+              if (oldHeader) oldHeader.textContent = (+oldHeader.textContent + 1);
+              if (newHeader) newHeader.textContent = (+newHeader.textContent - 1);
+              alert('Ошибка перемещения' + (res.message ? (': ' + res.message) : ''));
+            }
+          }
+        });
+      });
     }
 
     // ======= Карточка =======
@@ -255,20 +256,20 @@
       const row = state.rows.find(r=>String(r.id)===String(id));
       if (!row) return;
 
-      $('#f_id').value = row.id || '';
-      $('#f_date').value = row['Дата заказа'] || '';
+      $('#f_id').value    = row.id || '';
+      $('#f_date').value  = row['Дата заказа'] || '';
       $('#f_phone').value = row['Телефон клиента'] || '';
       $('#f_price').value = row['Цена,$'] || '';
       $('#f_title').value = row['Наименование детали'] || '';
-      $('#f_art').value = row['Артикул поставщика'] || '';
-      $('#f_link').value = row['Ссылка'] || '';
-      $('#f_sale').value = row['Продажа'] || '';
-      $('#f_buy').value = row['Закупка'] || '';
-      $('#f_cash').value = row['Касса'] || '';
-      $('#f_log').value = row['Логисты'] || '';
-      $('#f_refc').value = row['Возврат клиенту'] || '';
-      $('#f_refp').value = row['Возврат от поставщика'] || '';
-      $('#f_profit').value = row['Прибыль с заказа'] || '';
+      $('#f_art').value   = row['Артикул поставщика'] || '';
+      $('#f_link').value  = row['Ссылка'] || '';
+      $('#f_sale').value  = row['Продажа'] || '';
+      $('#f_buy').value   = row['Закупка'] || '';
+      $('#f_cash').value  = row['Касса'] || '';
+      $('#f_log').value   = row['Логисты'] || '';
+      $('#f_refc').value  = row['Возврат клиенту'] || '';
+      $('#f_refp').value  = row['Возврат от поставщика'] || '';
+      $('#f_profit').value= row['Прибыль с заказа'] || '';
       $('#f_comment').value = row['Коментарий'] || '';
 
       const sel = $('#f_status'); sel.innerHTML='';
@@ -287,6 +288,7 @@
 
     $('#btnSave').onclick = async (ev)=>{
       ev.preventDefault();
+      overlay(true,'Сохраняем…');
       const id = $('#f_id').value;
       const patch = {
         'Дата заказа': $('#f_date').value,
@@ -308,7 +310,8 @@
       if (state.hasManager) patch[OPTIONAL_MANAGER_FIELD] = $('#f_manager').value;
 
       const res = await api('update', { id, row:patch, token: state.token });
-      if (!res.ok) return showApiError(res, 'Ошибка сохранения');
+      overlay(false);
+      if (!res.ok) return alert('Ошибка сохранения' + (res.message?(': '+res.message):''));
 
       const idx = state.rows.findIndex(r=>String(r.id)===String(id));
       if (idx>=0){ state.rows[idx] = res.row; renderBoard(); }
@@ -320,8 +323,10 @@
       const id = $('#f_id').value;
       const trash = FUNNEL_COLUMNS.includes('Помойка') ? 'Помойка' : FUNNEL_COLUMNS.at(-1);
       if (!confirm('Перенести карточку в «Помойка»?')) return;
+      overlay(true,'Перемещаем…');
       const res = await api('move', { id, status:trash, token: state.token });
-      if (!res.ok) return showApiError(res, 'Ошибка операции');
+      overlay(false);
+      if (!res.ok) return alert('Ошибка операции');
       const idx = state.rows.findIndex(r=>String(r.id)===String(id));
       if (idx>=0){ state.rows[idx]['Статус'] = trash; renderBoard(); }
       $('#dlgCard').close();
@@ -341,8 +346,10 @@
         'Статус': FUNNEL_COLUMNS[0], 'Коментарий':''
       };
       if (state.hasManager) row[OPTIONAL_MANAGER_FIELD] = '';
+      overlay(true,'Создаём лид…');
       const res = await api('create', { row, token: state.token });
-      if (!res.ok) return showApiError(res, 'Ошибка создания');
+      overlay(false);
+      if (!res.ok) return alert('Ошибка создания');
       state.rows.unshift(res.row); renderBoard(); openCard(res.row.id);
     };
 
@@ -364,50 +371,33 @@
       ev.preventDefault();
       $('#gateMsg').classList.add('hidden');
       const pwd = $('#pwd').value.trim();
-      if (!pwd){ showGateMsg('Введите пароль'); return; }
+      if (!pwd){ $('#gateMsg').textContent='Введите пароль'; $('#gateMsg').classList.remove('hidden'); return; }
+      overlay(true,'Входим…');
       const r = await api('auth', { password: pwd });
-      if (!r.ok) { showGateMsg(r.message || r.error || 'Неверный пароль'); return; }
+      overlay(false);
+      if (!r.ok) { $('#gateMsg').textContent = r.message || r.error || 'Неверный пароль'; $('#gateMsg').classList.remove('hidden'); return; }
       state.token = r.token; localStorage.setItem('crm_token', state.token);
       await loadData(); showApp(true);
     };
-
     $('#btnLogout').onclick = ()=>{ state.token=''; localStorage.removeItem('crm_token'); showApp(false); };
 
-    function showGateMsg(msg){ const el = $('#gateMsg'); el.textContent = String(msg||''); el.classList.remove('hidden'); }
-
-    function showApiError(res, fallback){
-      console.log('API error:', res);
-      if (res.error === 'unauthorized'){ state.token=''; localStorage.removeItem('crm_token'); showApp(false); alert('Сессия истекла. Войдите снова.'); return; }
-      if (res.error === 'bad_json'){ alert((fallback||'Ошибка') + '\nСервер вернул не-JSON:\n' + (res.raw||'')); return; }
-      if (res.error === 'network'){ alert('Сеть недоступна или API не отвечает'); return; }
-      alert((fallback||'Ошибка') + (res.message ? (': ' + res.message) : (res.error ? (': ' + res.error) : '')));
-    }
-
-    // ======= Загрузка данных после логина =======
     async function loadData(){
-      setLoading(true);
-      const res = await api('list', { token: state.token }); // list закрыт токеном
-      setLoading(false);
-      if (!res.ok) return showApiError(res, 'Ошибка загрузки данных');
+      renderSkeleton(); $('#skeleton').classList.remove('hidden'); $('#board').classList.add('hidden');
+      const res = await api('list', { token: state.token });
+      if (!res.ok) { alert('Ошибка загрузки данных'); return; }
       state.rows = res.rows || [];
       state.hasManager = state.rows.some(r => r && Object.prototype.hasOwnProperty.call(r, OPTIONAL_MANAGER_FIELD));
       $('#f_status').innerHTML = FUNNEL_COLUMNS.map(s=>`<option>${s}</option>`).join('');
       renderBoard();
+      $('#skeleton').classList.add('hidden'); $('#board').classList.remove('hidden');
     }
 
-    // Автовход, если токен уже есть
+    // Автовход при наличии токена
     (async function bootstrap(){
       if (state.token) {
-        const res = await api('list', { token: state.token });
-        if (res.ok) {
-          state.rows = res.rows || [];
-          state.hasManager = state.rows.some(r => r && Object.prototype.hasOwnProperty.call(r, OPTIONAL_MANAGER_FIELD));
-          $('#f_status').innerHTML = FUNNEL_COLUMNS.map(s=>`<option>${s}</option>`).join('');
-          renderBoard(); showApp(true);
-        } else {
-          state.token=''; localStorage.removeItem('crm_token'); showApp(false);
-        }
+        await loadData(); showApp(true);
       } else {
+        renderSkeleton();
         showApp(false);
       }
     })();
