@@ -7,19 +7,11 @@
 
   <!-- === НАСТРОЙКИ === -->
   <script>
-    // URL задеплоенного Web App (GAS), обязательно оканчивается на /exec
     const API_URL = 'https://script.google.com/macros/s/AKfycbw8aLams3GM9rRNNAhhVQmWnXIt7sDlzLUsXDsSWh2OVg6_eX8_wD0hFKHsmd0IYsRx/exec';
-
-    // Колонки воронки (точно как в столбце "Статус")
     const FUNNEL_COLUMNS = [
-      'Обращение (Лид)',
-      'Заказ оформлен',
-      'Ожидаем оплату',
-      'На доставке',
-      'Отгружен',
-      'Помойка'
+      'Обращение (Лид)','Заказ оформлен','Ожидаем оплату',
+      'На доставке','Отгружен','Помойка'
     ];
-    // Необязательный столбец. Если есть — появится поле «Менеджер»
     const OPTIONAL_MANAGER_FIELD = 'Менеджер';
   </script>
 
@@ -27,7 +19,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- SortableJS для плавного DnD -->
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -35,18 +26,15 @@
   <style>
     body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
     dialog::backdrop { background: rgba(0,0,0,.35); }
-
     /* Скелетон */
     .shimmer { position: relative; overflow: hidden; background: #e5e7eb; border-radius: .5rem; }
     .shimmer::after{
-      content:''; position:absolute; inset:0;
-      transform: translateX(-100%);
+      content:''; position:absolute; inset:0; transform: translateX(-100%);
       background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent);
       animation: shimmer 1.2s infinite;
     }
     @keyframes shimmer { 100% { transform: translateX(100%); } }
-
-    /* Мобильная диалоговая — на весь экран */
+    /* Диалог на мобиле — фуллскрин */
     @media (max-width: 640px){
       dialog { width: 100vw !important; max-width: 100vw !important; height: 100vh; border-radius: 0 !important; }
     }
@@ -62,7 +50,7 @@
     </div>
   </div>
 
-  <!-- Логин-экран -->
+  <!-- Логин -->
   <section id="gate" class="min-h-screen flex items-center justify-center p-4">
     <div class="w-full max-w-md bg-white border rounded-2xl shadow-xl p-6 animate-[fadeIn_.4s_ease]">
       <h1 class="text-2xl font-bold mb-1">Вход в CRM</h1>
@@ -74,10 +62,9 @@
     </div>
   </section>
 
-  <!-- Приложение (после логина) -->
+  <!-- Приложение -->
   <main id="app" class="hidden">
     <div class="max-w-[1400px] mx-auto p-4">
-      <!-- Шапка -->
       <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div class="flex items-center justify-between sm:justify-start gap-3">
           <h2 class="text-2xl font-bold">CRM-воронка</h2>
@@ -90,23 +77,12 @@
         </div>
       </header>
 
-      <!-- Скелетон -->
+      <!-- Скелетон при загрузке -->
       <div id="skeleton" class="mb-2">
-        <div class="flex sm:grid sm:grid-cols-3 xl:grid-cols-6 gap-3 overflow-x-auto snap-x snap-mandatory pb-2">
-          <template id="skCol">
-            <div class="min-w-[85vw] sm:min-w-0 sm:flex-1 bg-white border rounded-2xl p-3">
-              <div class="h-5 w-40 shimmer mb-3"></div>
-              <div class="space-y-3">
-                <div class="h-16 shimmer rounded-lg"></div>
-                <div class="h-16 shimmer rounded-lg"></div>
-                <div class="h-16 shimmer rounded-lg"></div>
-              </div>
-            </div>
-          </template>
-        </div>
+        <div class="flex sm:grid sm:grid-cols-3 xl:grid-cols-6 gap-3 overflow-x-auto snap-x snap-mandatory pb-2"></div>
       </div>
 
-      <!-- Доска: на мобиле горизонтальный скролл + snap -->
+      <!-- Доска -->
       <section id="board" class="hidden flex sm:grid sm:grid-cols-3 xl:grid-cols-6 gap-3 overflow-x-auto sm:overflow-visible snap-x snap-mandatory pb-4"></section>
     </div>
   </main>
@@ -127,12 +103,12 @@
         <div><label class="block text-slate-600">Закупка</label><input id="f_buy" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
         <div><label class="block text-slate-600">Касса</label><input id="f_cash" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
         <div><label class="block text-slate-600">Логисты</label><input id="f_log" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
-        <div><label class="block text-slate-600">Возврат клиенту</label><input id="f_refc" class="w-full border rounded px-2 py-1 bg-white text-сlate-900" /></div>
-        <div><label class="block text-slate-600">Возврат от поставщика</label><input id="f_refp" class="w-full border rounded px-2 py-1 bg-white text-сlate-900" /></div>
-        <div><label class="block text-slate-600">Прибыль с заказа</label><input id="f_profit" class="w-full border rounded px-2 py-1 bg-white text-сlate-900" /></div>
-        <div><label class="block text-slate-600">Статус</label><select id="f_status" class="w-full border rounded px-2 py-1 bg-white text-сlate-900"></select></div>
-        <div class="sm:col-span-2"><label class="block text-slate-600">Коментарий</label><textarea id="f_comment" class="w-full border rounded px-2 py-1 bg-white text-сlate-900" rows="3"></textarea></div>
-        <div class="sm:col-span-2" id="managerRow" style="display:none"><label class="block text-slate-600">Менеджер</label><input id="f_manager" class="w-full border rounded px-2 py-1 bg-white text-сlate-900" /></div>
+        <div><label class="block text-slate-600">Возврат клиенту</label><input id="f_refc" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
+        <div><label class="block text-slate-600">Возврат от поставщика</label><input id="f_refp" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
+        <div><label class="block text-slate-600">Прибыль с заказа</label><input id="f_profit" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
+        <div><label class="block text-slate-600">Статус</label><select id="f_status" class="w-full border rounded px-2 py-1 bg-white text-slate-900"></select></div>
+        <div class="sm:col-span-2"><label class="block text-slate-600">Коментарий</label><textarea id="f_comment" class="w-full border rounded px-2 py-1 bg-white text-slate-900" rows="3"></textarea></div>
+        <div class="sm:col-span-2" id="managerRow" style="display:none"><label class="block text-slate-600">Менеджер</label><input id="f_manager" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
       </div>
       <div class="flex justify-between mt-4">
         <button id="btnDelete" class="px-3 py-2 rounded-lg border bg-white" value="cancel">Перенести в «Помойка»</button>
@@ -154,30 +130,35 @@
     function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
     function overlay(on, text){ const o=$('#overlay'); $('#overlayText').textContent=text||'Загрузка…'; o.classList.toggle('hidden', !on); o.classList.toggle('flex', on); }
 
-    // Универсальный вызов API
     async function api(action, payload = {}) {
       const body = { action, ...payload };
       try {
-        const r = await fetch(API_URL, {
-          method:'POST',
-          headers:{ 'Content-Type':'text/plain;charset=utf-8' },
-          body: JSON.stringify(body)
-        });
-        const txt = await r.text();
-        let data; try { data = JSON.parse(txt); } catch { return { ok:false, error:'bad_json', raw:txt }; }
+        const r = await fetch(API_URL, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
+        const txt = await r.text(); let data; try { data = JSON.parse(txt); } catch { return { ok:false, error:'bad_json', raw:txt }; }
         return data;
-      } catch (err) {
-        return { ok:false, error:'network', detail:String(err) };
+      } catch (err) { return { ok:false, error:'network', detail:String(err) }; }
+    }
+
+    // ======= Скелетон без template =======
+    function renderSkeleton() {
+      const wrap = $('#skeleton > div');
+      if (!wrap) return;
+      wrap.innerHTML = '';
+      for (let i=0;i<6;i++){
+        const col = document.createElement('div');
+        col.className = 'min-w-[85vw] sm:min-w-0 sm:flex-1 bg-white border rounded-2xl p-3';
+        col.innerHTML = `
+          <div class="h-5 w-40 shimmer mb-3"></div>
+          <div class="space-y-3">
+            <div class="h-16 shimmer rounded-lg"></div>
+            <div class="h-16 shimmer rounded-lg"></div>
+            <div class="h-16 shimmer rounded-lg"></div>
+          </div>`;
+        wrap.appendChild(col);
       }
     }
 
-    // ======= Рендер =======
-    function renderSkeleton() {
-      const host = $('#skeleton > div'); host.innerHTML='';
-      const tpl = $('#skCol').content;
-      for (let i=0;i<6;i++) host.appendChild(tpl.cloneNode(true));
-    }
-
+    // ======= Рендер доски =======
     function renderBoard(){
       const board = $('#board'); board.innerHTML = '';
       FUNNEL_COLUMNS.forEach(col => {
@@ -196,19 +177,17 @@
         colBox.querySelector('.count').textContent = items.length;
         board.appendChild(colBox);
       });
-      setupDnD(); // включаем плавное DnD
+      setupDnD();
     }
 
     function renderCard(row){
       const card = document.createElement('div');
       card.className = 'card bg-slate-50 text-slate-900 border rounded-lg p-2 cursor-move transition hover:shadow-md';
       card.dataset.id = row.id;
-
       const title = (row['Наименование детали']||'').toString();
       const phone = (row['Телефон клиента']||'').toString();
       const price = (row['Цена,$']||'').toString();
       const manager = state.hasManager ? (row[OPTIONAL_MANAGER_FIELD]||'') : '';
-
       card.innerHTML = `
         <div class="flex items-center justify-between gap-2">
           <div class="text-sm font-semibold line-clamp-2">${escapeHtml(title)}</div>
@@ -222,34 +201,27 @@
       return card;
     }
 
-    // ======= DnD на SortableJS (плавное + без полной перерисовки) =======
+    // ======= DnD (SortableJS) =======
     function setupDnD(){
       $$('.col-drop').forEach(el => {
         new Sortable(el, {
-          group: 'kanban',
-          animation: 150,
-          ghostClass: 'opacity-60',
-          dragClass: 'ring-2 ring-slate-300',
+          group: 'kanban', animation: 150, ghostClass: 'opacity-60', dragClass: 'ring-2 ring-slate-300',
           onAdd: async (evt) => {
             const card = evt.item;
             const id = card.dataset.id;
             const newStatus = evt.to.dataset.status;
 
-            // локально меняем статус
             const row = state.rows.find(r => String(r.id) === String(id));
             const prevStatus = row ? row['Статус'] : null;
             if (row) row['Статус'] = newStatus;
 
-            // визуальные счётчики
             const oldHeader = evt.from.parentElement.querySelector('.count');
             const newHeader = evt.to.parentElement.querySelector('.count');
             if (oldHeader) oldHeader.textContent = (+oldHeader.textContent - 1);
             if (newHeader) newHeader.textContent = (+newHeader.textContent + 1);
 
-            // сохраняем на сервере
             const res = await api('move', { id, status: newStatus, token: state.token });
             if (!res.ok) {
-              // откат
               if (row) row['Статус'] = prevStatus;
               evt.from.insertBefore(card, evt.from.children[evt.oldDraggableIndex] || null);
               if (oldHeader) oldHeader.textContent = (+oldHeader.textContent + 1);
@@ -265,7 +237,6 @@
     function openCard(id){
       const row = state.rows.find(r=>String(r.id)===String(id));
       if (!row) return;
-
       $('#f_id').value = row.id || '';
       $('#f_date').value = row['Дата заказа'] || '';
       $('#f_phone').value = row['Телефон клиента'] || '';
@@ -281,19 +252,11 @@
       $('#f_refp').value = row['Возврат от поставщика'] || '';
       $('#f_profit').value = row['Прибыль с заказа'] || '';
       $('#f_comment').value = row['Коментарий'] || '';
-
       const sel = $('#f_status'); sel.innerHTML='';
-      FUNNEL_COLUMNS.forEach(s=>{
-        const o = document.createElement('option'); o.value=o.textContent=s;
-        if (String(row['Статус'])===s) o.selected=true; sel.appendChild(o);
-      });
-
+      FUNNEL_COLUMNS.forEach(s=>{ const o = document.createElement('option'); o.value=o.textContent=s; if (String(row['Статус'])===s) o.selected=true; sel.appendChild(o); });
       if (state.hasManager) { $('#managerRow').style.display='block'; $('#f_manager').value = row[OPTIONAL_MANAGER_FIELD]||''; }
       else { $('#managerRow').style.display='none'; }
-
-      $('#btnSave').disabled = false;
-      $('#btnDelete').disabled = false;
-      $('#dlgCard').showModal();
+      $('#btnSave').disabled = false; $('#btnDelete').disabled = false; $('#dlgCard').showModal();
     }
 
     $('#btnSave').onclick = async (ev)=>{
@@ -301,28 +264,16 @@
       overlay(true,'Сохраняем…');
       const id = $('#f_id').value;
       const patch = {
-        'Дата заказа': $('#f_date').value,
-        'Телефон клиента': $('#f_phone').value,
-        'Цена,$': $('#f_price').value,
-        'Наименование детали': $('#f_title').value,
-        'Артикул поставщика': $('#f_art').value,
-        'Ссылка': $('#f_link').value,
-        'Продажа': $('#f_sale').value,
-        'Закупка': $('#f_buy').value,
-        'Касса': $('#f_cash').value,
-        'Логисты': $('#f_log').value,
-        'Возврат клиенту': $('#f_refc').value,
-        'Возврат от поставщика': $('#f_refp').value,
-        'Прибыль с заказа': $('#f_profit').value,
-        'Статус': $('#f_status').value,
-        'Коментарий': $('#f_comment').value,
+        'Дата заказа': $('#f_date').value,'Телефон клиента': $('#f_phone').value,'Цена,$': $('#f_price').value,
+        'Наименование детали': $('#f_title').value,'Артикул поставщика': $('#f_art').value,'Ссылка': $('#f_link').value,
+        'Продажа': $('#f_sale').value,'Закупка': $('#f_buy').value,'Касса': $('#f_cash').value,'Логисты': $('#f_log').value,
+        'Возврат клиенту': $('#f_refc').value,'Возврат от поставщика': $('#f_refp').value,'Прибыль с заказа': $('#f_profit').value,
+        'Статус': $('#f_status').value,'Коментарий': $('#f_comment').value,
       };
       if (state.hasManager) patch[OPTIONAL_MANAGER_FIELD] = $('#f_manager').value;
-
       const res = await api('update', { id, row:patch, token: state.token });
       overlay(false);
       if (!res.ok) return alert('Ошибка сохранения' + (res.message?(': '+res.message):''));
-
       const idx = state.rows.findIndex(r=>String(r.id)===String(id));
       if (idx>=0){ state.rows[idx] = res.row; renderBoard(); }
       $('#dlgCard').close();
@@ -345,15 +296,9 @@
     // ======= Новый лид =======
     $('#btnAdd').onclick = async ()=>{
       const row = {
-        'п/п':'',
-        'Дата заказа': new Date().toISOString().slice(0,10),
-        'Телефон клиента':'',
-        'Цена,$':'',
-        'Артикул поставщика':'',
-        'Наименование детали':'Новый лид',
-        'Ссылка':'','Касса':'','Продажа':'','Закупка':'','Логисты':'',
-        'Возврат клиенту':'','Возврат от поставщика':'','Прибыль с заказа':'',
-        'Статус': FUNNEL_COLUMNS[0], 'Коментарий':''
+        'п/п':'','Дата заказа': new Date().toISOString().slice(0,10),'Телефон клиента':'','Цена,$':'',
+        'Артикул поставщика':'','Наименование детали':'Новый лид','Ссылка':'','Касса':'','Продажа':'','Закупка':'','Логисты':'',
+        'Возврат клиенту':'','Возврат от поставщика':'','Прибыль с заказа':'','Статус': FUNNEL_COLUMNS[0],'Коментарий':''
       };
       if (state.hasManager) row[OPTIONAL_MANAGER_FIELD] = '';
       overlay(true,'Создаём лид…');
@@ -379,32 +324,25 @@
     // ======= Вход/Выход =======
     $('#doLogin').onclick = async (ev)=>{
       ev.preventDefault();
-      $('#gateMsg').classList.add('hidden');
       const pwd = $('#pwd').value.trim();
+      $('#gateMsg').classList.add('hidden');
       if (!pwd){ const el=$('#gateMsg'); el.textContent='Введите пароль'; el.classList.remove('hidden'); return; }
       overlay(true,'Входим…');
       const r = await api('auth', { password: pwd });
       overlay(false);
       if (!r.ok) { const el=$('#gateMsg'); el.textContent = r.message || r.error || 'Неверный пароль'; el.classList.remove('hidden'); return; }
       state.token = r.token; localStorage.setItem('crm_token', state.token);
-      await loadData(); showApp(true);
+      try { await loadData(); showApp(true); }
+      catch(e){ const el=$('#gateMsg'); el.textContent='Ошибка загрузки: '+e; el.classList.remove('hidden'); }
     };
-
     $('#btnLogout').onclick = ()=>{ state.token=''; localStorage.removeItem('crm_token'); showApp(false); };
-
-    function showApiError(res, fallback){
-      console.log('API error:', res);
-      if (res.error === 'unauthorized'){ state.token=''; localStorage.removeItem('crm_token'); showApp(false); alert('Сессия истекла. Войдите снова.'); return; }
-      if (res.error === 'bad_json'){ alert((fallback||'Ошибка') + '\nСервер вернул не-JSON:\n' + (res.raw||'')); return; }
-      if (res.error === 'network'){ alert('Сеть недоступна или API не отвечает'); return; }
-      alert((fallback||'Ошибка') + (res.message ? (': ' + res.message) : (res.error ? (': ' + res.error) : '')));
-    }
 
     // ======= Загрузка данных =======
     async function loadData(){
-      renderSkeleton(); $('#skeleton').classList.remove('hidden'); $('#board').classList.add('hidden');
+      renderSkeleton();
+      $('#skeleton').classList.remove('hidden'); $('#board').classList.add('hidden');
       const res = await api('list', { token: state.token });
-      if (!res.ok) { alert('Ошибка загрузки данных'); return; }
+      if (!res.ok) throw (res.message || res.error || 'network');
       state.rows = res.rows || [];
       state.hasManager = state.rows.some(r => r && Object.prototype.hasOwnProperty.call(r, OPTIONAL_MANAGER_FIELD));
       $('#f_status').innerHTML = FUNNEL_COLUMNS.map(s=>`<option>${s}</option>`).join('');
@@ -412,10 +350,11 @@
       $('#skeleton').classList.add('hidden'); $('#board').classList.remove('hidden');
     }
 
-    // Автовход, если токен уже есть
+    // Автовход
     (async function bootstrap(){
       if (state.token) {
-        await loadData(); showApp(true);
+        try { await loadData(); showApp(true); }
+        catch { showApp(false); }
       } else {
         renderSkeleton();
         showApp(false);
