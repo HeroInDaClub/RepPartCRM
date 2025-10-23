@@ -240,7 +240,8 @@
           ghostClass: 'opacity-60',
           dragClass: 'ring-2 ring-slate-300',
           onStart(){ DRAGGING = true; },
-          onEnd(evt){ setTimeout(()=>{ DRAGGING = false; }, 0); if (evt.from !== evt.to) handleMove(evt); },
+          // Only handle cross-column moves once via `onAdd` to avoid double-processing
+          onEnd(evt){ setTimeout(()=>{ DRAGGING = false; }, 0); },
           onAdd: handleMove,
         });
       });
@@ -283,7 +284,8 @@
       if (!ok) {
         if (row) row['Статус'] = prevStatus;
         try {
-          evt.from.insertBefore(card, evt.from.children[evt.oldDraggableIndex] || null);
+          const revertIndex = (typeof evt.oldDraggableIndex === 'number') ? evt.oldDraggableIndex : evt.oldIndex;
+          evt.from.insertBefore(card, (typeof revertIndex === 'number') ? (evt.from.children[revertIndex] || null) : null);
           if (oldHeader) oldHeader.textContent = (+oldHeader.textContent + 1);
           if (newHeader) newHeader.textContent = Math.max(0, (+newHeader.textContent - 1));
         } catch(_){}
