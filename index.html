@@ -6,10 +6,9 @@
   <title>CRM Воронка — Google Sheets</title>
 
   <!-- PWA / иконки -->
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="alternate icon" href="/favicon.png" type="image/png">
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
-  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#000000">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="RepPart CRM">
@@ -238,7 +237,9 @@
           fallbackTolerance: 6,
           emptyInsertThreshold: 5,
           ghostClass: 'opacity-60',
-          dragClass: 'ring-2 ring-slate-300',
+          // Use single-token classes to avoid DOMTokenList.add errors
+          chosenClass: 'ring-slate-300',
+          dragClass: 'ring-2',
           onStart(){ DRAGGING = true; },
           // Only handle cross-column moves once via `onAdd` to avoid double-processing
           onEnd(evt){ setTimeout(()=>{ DRAGGING = false; }, 0); },
