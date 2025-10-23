@@ -289,7 +289,14 @@
       let ok = true;
 
       while (true) {
-        const res = await api('move', { id, status: currentTarget, token: state.token });
+        const statusKey0 = getStatusFieldKey(row||{});
+        let res;
+        if (statusKey0) {
+          const patch0 = {}; patch0[statusKey0] = currentTarget;
+          res = await api('update', { id, row: patch0, token: state.token });
+        } else {
+          res = { ok:false };
+        }
         if (!res.ok) {
           // Fallback: если бэкенд не поддерживает action "move", пробуем обычный update
           const statusKey = getStatusFieldKey(row||{});
@@ -408,7 +415,15 @@
       const trash = FUNNEL_COLUMNS.includes('Помойка') ? 'Помойка' : FUNNEL_COLUMNS.at(-1);
       if (!confirm('Перенести карточку в «Помойка»?')) return;
       overlay(true,'Перемещаем…');
-      let res = await api('move', { id, status:trash, token: state.token });
+      const rowDel = state.rows.find(r=>String(r.id)===String(id));
+      const statusKeyDel = getStatusFieldKey(rowDel||{});
+      let res;
+      if (statusKeyDel){
+        const patchDel = {}; patchDel[statusKeyDel] = trash;
+        res = await api('update', { id, row: patchDel, token: state.token });
+      } else {
+        res = { ok:false };
+      }
       overlay(false);
       if (!res.ok) {
         const row = state.rows.find(r=>String(r.id)===String(id));
