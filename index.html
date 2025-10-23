@@ -59,6 +59,11 @@
     @media (max-width: 640px){
       dialog { width: 100vw !important; max-width: 100vw !important; height: 100vh; border-radius: 0 !important; }
     }
+</style>
+  <style>
+    /* Mobile drag handle and touch improvements */
+    .card { touch-action: pan-y; }
+    .drag-handle { -webkit-user-drag: none; user-select: none; touch-action: none; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
@@ -242,22 +247,33 @@
       const price = (row['Цена,$']||'').toString();
       const manager = state.hasManager ? (row[OPTIONAL_MANAGER_FIELD]||'') : '';
       card.innerHTML = `
-        <div class="flex items-center justify-between gap-2">
-          <div class="text-sm font-semibold line-clamp-2">${escapeHtml(title)}</div>
-          <div class="text-xs text-slate-600">$${escapeHtml(price)}</div>
-        </div>
-        <div class="mt-1 flex items-center justify-between text-xs text-slate-700">
-          <div>${escapeHtml(phone)}</div>
-          ${manager?`<div class="px-2 py-0.5 bg-slate-200 rounded-full">${escapeHtml(manager)}</div>`:''}
+        <div class="flex items-start gap-2">
+          <div class="drag-handle sm:hidden -m-2 mr-1 px-2 py-2 shrink-0 self-stretch flex items-center justify-center text-slate-400">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 4h4v2h-4V4m0 7h4v2h-4v-2m0 7h4v2h-4v-2"/></svg>
+            <span class="sr-only">Перетащить</span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between gap-2">
+              <div class="text-sm font-semibold line-clamp-2">${escapeHtml(title)}</div>
+              <div class="text-xs text-slate-600">$${escapeHtml(price)}</div>
+            </div>
+            <div class="mt-1 flex items-center justify-between text-xs text-slate-700">
+              <div class="truncate">${escapeHtml(phone)}</div>
+              ${manager?`<div class=\"px-2 py-0.5 bg-slate-200 rounded-full\">${escapeHtml(manager)}</div>`:''}
+            </div>
+          </div>
         </div>`;
       card.addEventListener('click', ()=>{ if (!DRAGGING) openCard(row.id); });
+      const h = card.querySelector('.drag-handle');
+      if (h){ ['mousedown','touchstart','click'].forEach(ev=> h.addEventListener(ev, e=> e.stopPropagation(), {passive:true})); }
       return card;
     }
 
     function setupDnD(){
+      const useHandle = (window.matchMedia && window.matchMedia('(max-width: 640px)').matches) ? true : false;
       $$('.col-drop').forEach(el => {
         if (el._sortable && typeof el._sortable.destroy === 'function') el._sortable.destroy();
-        el._sortable = new Sortable(el, {
+        const opts = {
           group: { name:'kanban', pull:true, put:true },
           animation: 180,
           forceFallback: true,
@@ -272,9 +288,17 @@
           // Only handle cross-column moves once via `onAdd` to avoid double-processing
           onEnd(evt){ setTimeout(()=>{ DRAGGING = false; }, 0); },
           onAdd: handleMove,
-        });
+        };
+        if (useHandle) opts.handle = '.drag-handle';
+        el._sortable = new Sortable(el, opts);
       });
     }
+
+    // Reconfigure DnD on viewport changes to toggle mobile handle
+    try {
+      window.addEventListener('resize', ()=>{ try { setupDnD(); } catch(_){} });
+      window.addEventListener('orientationchange', ()=>{ try { setupDnD(); } catch(_){} });
+    } catch(_){ }
 
     async function handleMove(evt){
       const card = evt.item;
