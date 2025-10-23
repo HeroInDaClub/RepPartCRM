@@ -158,6 +158,15 @@
       try {
         const r = await fetch(API_URL, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
         const txt = await r.text(); let data; try { data = JSON.parse(txt); } catch { return { ok:false, error:'bad_json', raw:txt }; }
+        if (!data.ok && data.error === 'unauthorized') {
+          try {
+            console.warn('Unauthorized; forcing re-login');
+            state.token = '';
+            localStorage.removeItem('crm_token');
+            const err = $('#gateMsg'); if (err){ err.textContent = 'Сессия истекла. Войдите снова.'; err.classList.remove('hidden'); }
+            showApp(false);
+          } catch(_){ }
+        }
         return data;
       } catch (err) { return { ok:false, error:'network', detail:String(err) }; }
     }
