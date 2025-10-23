@@ -248,8 +248,8 @@
       const manager = state.hasManager ? (row[OPTIONAL_MANAGER_FIELD]||'') : '';
       card.innerHTML = `
         <div class="flex items-start gap-2">
-          <div class="drag-handle sm:hidden -m-2 mr-1 px-2 py-2 shrink-0 self-stretch flex items-center justify-center text-slate-400">
-            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M10 4h4v2h-4V4m0 7h4v2h-4v-2m0 7h4v2h-4v-2"/></svg>
+          <div class="drag-handle sm:hidden -m-2 mr-1 px-1 py-2 w-6 shrink-0 self-stretch flex items-center justify-center text-slate-400 cursor-grab active:cursor-grabbing">
+            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9 5a1 1 0 1 1-2 0a1 1 0 0 1 2 0m0 14a1 1 0 1 1-2 0a1 1 0 0 1 2 0m0-7a1 1 0 1 1-2 0a1 1 0 0 1 2 0m8-7a1 1 0 1 1-2 0a1 1 0 0 1 2 0m0 14a1 1 0 1 1-2 0a1 1 0 0 1 2 0m0-7a1 1 0 1 1-2 0a1 1 0 0 1 2 0"/></svg>
             <span class="sr-only">Перетащить</span>
           </div>
           <div class="flex-1 min-w-0">
@@ -265,7 +265,7 @@
         </div>`;
       card.addEventListener('click', ()=>{ if (!DRAGGING) openCard(row.id); });
       const h = card.querySelector('.drag-handle');
-      if (h){ ['mousedown','touchstart','click'].forEach(ev=> h.addEventListener(ev, e=> e.stopPropagation(), {passive:true})); }
+      if (h){ h.addEventListener('click', e=> e.stopPropagation()); }
       return card;
     }
 
@@ -286,7 +286,7 @@
           dragClass: 'ring-2',
           onStart(){ DRAGGING = true; },
           // Only handle cross-column moves once via `onAdd` to avoid double-processing
-          onEnd(evt){ setTimeout(()=>{ DRAGGING = false; }, 0); },
+          onEnd(evt){ setTimeout(()=>{ DRAGGING = false; }, 150); },
           onAdd: handleMove,
         };
         if (useHandle) opts.handle = '.drag-handle';
