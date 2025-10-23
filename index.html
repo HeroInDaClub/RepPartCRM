@@ -205,6 +205,24 @@
       setupDnD();
     }
 
+    // Определяем ключ поля статуса по значению, совпадающему с одним из столбцов воронки
+    function getStatusFieldKey(sample){
+      if (sample && typeof sample === 'object'){
+        for (const k of Object.keys(sample||{})){
+          const v = (sample[k]||'').toString().trim();
+          if (FUNNEL_COLUMNS.includes(v)) return k;
+        }
+      }
+      const any = (state.rows||[]).find(r=>r && typeof r==='object');
+      if (any){
+        for (const k of Object.keys(any)){
+          const v = (any[k]||'').toString().trim();
+          if (FUNNEL_COLUMNS.includes(v)) return k;
+        }
+      }
+      return '';
+    }
+
     function renderCard(row){
       const card = document.createElement('div');
       card.className = 'card bg-slate-50 text-slate-900 border rounded-lg p-2 cursor-move transition hover:shadow-md';
@@ -251,7 +269,7 @@
     async function handleMove(evt){
       const card = evt.item;
       const id = card?.dataset?.id;
-      const newStatus = evt.to?.dataset?.status;
+      const newStatus = (evt.to?.dataset?.status || '').trim();
       if (!id || !newStatus) return;
 
       const row = state.rows.find(r => String(r.id) === String(id));
@@ -272,7 +290,15 @@
 
       while (true) {
         const res = await api('move', { id, status: currentTarget, token: state.token });
-        if (!res.ok) { ok = false; break; }
+        if (!res.ok) {
+          // Fallback: если бэкенд не поддерживает action "move", пробуем обычный update
+          const statusKey = getStatusFieldKey(row||{});
+          if (statusKey) {
+            const patch = {}; patch[statusKey] = currentTarget;
+            const alt = await api('update', { id, row: patch, token: state.token });
+            if (!alt.ok) { ok = false; break; }
+          } else { ok = false; break; }
+        }
         if (pendingMove[id] && pendingMove[id] !== currentTarget) {
           currentTarget = pendingMove[id]; pendingMove[id] = undefined; continue;
         }
@@ -283,6 +309,7 @@
       pendingMove[id] = undefined;
 
       if (!ok) {
+        try { console.error('Move failed', { id, newStatus, prevStatus }); } catch(_){ }
         if (row) row['Статус'] = prevStatus;
         try {
           const revertIndex = (typeof evt.oldDraggableIndex === 'number') ? evt.oldDraggableIndex : evt.oldIndex;
@@ -306,6 +333,15 @@
       overlay(true,'Создаём лид…');
       const res = await api('create', { row, token: state.token });
       overlay(false);
+      if (!res.ok) {
+        const row = state.rows.find(r=>String(r.id)===String(id));
+        const statusKey = getStatusFieldKey(row||{});
+        if (statusKey){
+          const patch = {}; patch[statusKey] = trash;
+          const alt = await api('update', { id, row: patch, token: state.token });
+          if (alt && alt.ok) { try { res.ok = true; } catch(_){} }
+        }
+      }
       if (!res.ok) return alert('Ошибка создания');
 
       state.rows.unshift(res.row);
@@ -372,8 +408,17 @@
       const trash = FUNNEL_COLUMNS.includes('Помойка') ? 'Помойка' : FUNNEL_COLUMNS.at(-1);
       if (!confirm('Перенести карточку в «Помойка»?')) return;
       overlay(true,'Перемещаем…');
-      const res = await api('move', { id, status:trash, token: state.token });
+      let res = await api('move', { id, status:trash, token: state.token });
       overlay(false);
+      if (!res.ok) {
+        const row = state.rows.find(r=>String(r.id)===String(id));
+        const statusKey = getStatusFieldKey(row||{});
+        if (statusKey){
+          const patch = {}; patch[statusKey] = trash;
+          const alt = await api('update', { id, row: patch, token: state.token });
+          if (alt && alt.ok) { try { res.ok = true; } catch(_){} }
+        }
+      }
       if (!res.ok) return alert('Ошибка операции');
       const idx = state.rows.findIndex(r=>String(r.id)===String(id));
       if (idx>=0){ state.rows[idx]['Статус'] = trash; renderBoard(); }
