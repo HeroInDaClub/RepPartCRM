@@ -273,6 +273,11 @@
       if (!id || !newStatus) return;
 
       const row = state.rows.find(r => String(r.id) === String(id));
+      try { console.log('rowKeys', Object.keys(row||{})); } catch(_){ }
+      const statusKeyDetected = getStatusFieldKey(row||{});
+      const prevStatusDetected = (row && statusKeyDetected) ? row[statusKeyDetected] : undefined;
+      try { console.log('statusKeyDetected', statusKeyDetected, 'prev', prevStatusDetected, '->', newStatus); } catch(_){ }
+      if (row && statusKeyDetected) row[statusKeyDetected] = newStatus;
       const prevStatus = row ? row['Статус'] : null;
 
       if (row) row['Статус'] = newStatus;
@@ -292,7 +297,8 @@
         const statusKey0 = getStatusFieldKey(row||{});
         let res;
         if (statusKey0) {
-          const patch0 = {}; patch0[statusKey0] = currentTarget;
+          const patch0 = { ...(row||{}) }; try { delete patch0.id; } catch(_){}
+          patch0[statusKey0] = currentTarget;
           res = await api('update', { id, row: patch0, token: state.token });
         } else {
           res = { ok:false };
@@ -301,7 +307,8 @@
           // Fallback: если бэкенд не поддерживает action "move", пробуем обычный update
           const statusKey = getStatusFieldKey(row||{});
           if (statusKey) {
-            const patch = {}; patch[statusKey] = currentTarget;
+            const patch = { ...(row||{}) }; try { delete patch.id; } catch(_){}
+            patch[statusKey] = currentTarget;
             const alt = await api('update', { id, row: patch, token: state.token });
             if (!alt.ok) { ok = false; break; }
           } else { ok = false; break; }
@@ -317,6 +324,7 @@
 
       if (!ok) {
         try { console.error('Move failed', { id, newStatus, prevStatus }); } catch(_){ }
+        if (row && statusKeyDetected) row[statusKeyDetected] = prevStatusDetected;
         if (row) row['Статус'] = prevStatus;
         try {
           const revertIndex = (typeof evt.oldDraggableIndex === 'number') ? evt.oldDraggableIndex : evt.oldIndex;
