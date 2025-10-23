@@ -17,6 +17,7 @@
   <!-- === НАСТРОЙКИ === -->
   <script>
     const API_URL = 'https://script.google.com/macros/s/AKfycbw8aLams3GM9rRNNAhhVQmWnXIt7sDlzLUsXDsSWh2OVg6_eX8_wD0hFKHsmd0IYsRx/exec';
+    const STATUS_FIELD = 'Статус';
     const FUNNEL_COLUMNS = ['Обращение (Лид)','Заказ оформлен','Ожидаем оплату','На доставке','Отгружен','Помойка'];
     const OPTIONAL_MANAGER_FIELD = 'Менеджер';
   </script>
@@ -143,7 +144,7 @@
   <script>
     const $  = (sel,root=document)=>root.querySelector(sel);
     const $$ = (sel,root=document)=>Array.from(root.querySelectorAll(sel));
-    const state = { rows: [], token: localStorage.getItem('crm_token')||'', hasManager:false };
+    const state = { rows: [], token: localStorage.getItem('crm_token')||'', hasManager:false, statusKey: STATUS_FIELD };
     let DRAGGING = false;
     const inflightMove = Object.create(null);
     const pendingMove  = Object.create(null);
@@ -278,6 +279,7 @@
       const prevStatusDetected = (row && statusKeyDetected) ? row[statusKeyDetected] : undefined;
       try { console.log('statusKeyDetected', statusKeyDetected, 'prev', prevStatusDetected, '->', newStatus); } catch(_){ }
       if (row && statusKeyDetected) row[statusKeyDetected] = newStatus;
+      if (!state.statusKey && statusKeyDetected) state.statusKey = statusKeyDetected;
       const prevStatus = row ? row['Статус'] : null;
 
       if (row) row['Статус'] = newStatus;
@@ -297,8 +299,7 @@
         const statusKey0 = getStatusFieldKey(row||{});
         let res;
         if (statusKey0) {
-          const patch0 = { ...(row||{}) }; try { delete patch0.id; } catch(_){}
-          patch0[statusKey0] = currentTarget;
+          const patch0 = {}; patch0[statusKey0] = currentTarget;
           res = await api('update', { id, row: patch0, token: state.token });
         } else {
           res = { ok:false };
@@ -307,8 +308,7 @@
           // Fallback: если бэкенд не поддерживает action "move", пробуем обычный update
           const statusKey = getStatusFieldKey(row||{});
           if (statusKey) {
-            const patch = { ...(row||{}) }; try { delete patch.id; } catch(_){}
-            patch[statusKey] = currentTarget;
+            const patch = {}; patch[statusKey] = currentTarget;
             const alt = await api('update', { id, row: patch, token: state.token });
             if (!alt.ok) { ok = false; break; }
           } else { ok = false; break; }
@@ -324,6 +324,7 @@
 
       if (!ok) {
         try { console.error('Move failed', { id, newStatus, prevStatus }); } catch(_){ }
+        if (row && statusKeyDetected) row[statusKeyDetected] = prevStatusDetected;
         if (row && statusKeyDetected) row[statusKeyDetected] = prevStatusDetected;
         if (row) row['Статус'] = prevStatus;
         try {
@@ -344,6 +345,7 @@
         'Возврат клиенту':'','Возврат от поставщика':'','Прибыль с заказа':'',
         'Статус': FUNNEL_COLUMNS[0], 'Коментарий':''
       };
+      try { row[STATUS_FIELD] = FUNNEL_COLUMNS[0]; } catch(_){ }
       if (state.hasManager) row[OPTIONAL_MANAGER_FIELD] = '';
       overlay(true,'Создаём лид…');
       const res = await api('create', { row, token: state.token });
@@ -413,6 +415,7 @@
       overlay(false);
       if (!res.ok) return alert('Ошибка сохранения' + (res.message?(': '+res.message):''));
       const idx = state.rows.findIndex(r=>String(r.id)===String(id));
+      
       if (idx>=0){ state.rows[idx] = res.row; renderBoard(); }
       $('#dlgCard').close();
     };
