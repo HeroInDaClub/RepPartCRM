@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
@@ -14,9 +14,9 @@
   <meta name="apple-mobile-web-app-title" content="RepPart CRM">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-  <!-- Tailwind (для простоты; можно заменить на локальную сборку) -->
+  <!-- Tailwind (РґР»СЏ РїСЂРѕСЃС‚РѕС‚С‹; РјРѕР¶РЅРѕ Р·Р°РјРµРЅРёС‚СЊ РЅР° Р»РѕРєР°Р»СЊРЅСѓСЋ СЃР±РѕСЂРєСѓ) -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- SortableJS для DnD -->
+  <!-- SortableJS РґР»СЏ DnD -->
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
   <style>
@@ -34,33 +34,33 @@
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
 
-  <!-- Оверлей загрузки -->
+  <!-- РћРІРµСЂР»РµР№ Р·Р°РіСЂСѓР·РєРё -->
   <div id="overlay" class="fixed inset-0 hidden z-50 items-center justify-center bg-black/30 backdrop-blur-sm">
     <div class="bg-white rounded-xl shadow-xl px-4 py-3 flex items-center gap-3">
       <svg width="20" height="20" viewBox="0 0 24 24" class="animate-spin text-slate-700"><path fill="currentColor" d="M12 2a1 1 0 0 1 1 1v2a1 1 0 1 1-2 0V3a1 1 0 0 1 1-1m7.07 3.93a1 1 0 0 1 0 1.41l-1.42 1.42a1 1 0 1 1-1.41-1.41l1.41-1.42a1 1 0 0 1 1.42 0M21 11a1 1 0 0 1 1 1a9.99 9.99 0 0 1-10 10a1 1 0 1 1 0-2a8 8 0 0 0 8-8a1 1 0 0 1 1-1"/></svg>
-      <span id="overlayText" class="text-sm">Загрузка…</span>
+      <span id="overlayText" class="text-sm">Р—Р°РіСЂСѓР·РєР°вЂ¦</span>
     </div>
   </div>
 
-  <!-- Экран входа -->
+  <!-- Р­РєСЂР°РЅ РІС…РѕРґР° -->
   <section id="gate" class="min-h-screen flex items-center justify-center p-4">
     <div class="w-full max-w-md bg-white border rounded-2xl shadow-xl p-6">
-      <h1 class="text-2xl font-bold mb-2">Вход в CRM</h1>
-      <p class="text-sm text-slate-600 mb-4">Введите пароль доступа.</p>
-      <label class="block text-sm text-slate-600 mb-1">Пароль</label>
+      <h1 class="text-2xl font-bold mb-2">Р’С…РѕРґ РІ CRM</h1>
+      <p class="text-sm text-slate-600 mb-4">Р’РІРµРґРёС‚Рµ РїР°СЂРѕР»СЊ РґРѕСЃС‚СѓРїР°.</p>
+      <label class="block text-sm text-slate-600 mb-1">РџР°СЂРѕР»СЊ</label>
       <input id="pwd" type="password" class="w-full border rounded px-3 py-2 mb-2" />
       <div id="gateMsg" class="hidden text-sm text-red-600 mb-3"></div>
-      <button id="doLogin" class="w-full px-3 py-2 rounded-lg bg-black text-white">Войти</button>
+      <button id="doLogin" class="w-full px-3 py-2 rounded-lg bg-black text-white">Р’РѕР№С‚Рё</button>
     </div>
   </section>
 
-  <!-- Приложение -->
+  <!-- РџСЂРёР»РѕР¶РµРЅРёРµ -->
   <section id="app" class="hidden p-3 sm:p-4 max-w-7xl mx-auto">
     <div class="flex items-center justify-between gap-3 mb-3">
       <div class="font-bold text-xl">RepPart CRM</div>
       <div class="flex items-center gap-2">
-        <input id="search" placeholder="Поиск" class="border rounded px-2 py-1 text-sm" />
-        <button id="btnLogout" class="px-2 py-1 text-sm rounded border">Выйти</button>
+        <input id="search" placeholder="РџРѕРёСЃРє" class="border rounded px-2 py-1 text-sm" />
+        <button id="btnLogout" class="px-2 py-1 text-sm rounded border">Р’С‹Р№С‚Рё</button>
       </div>
     </div>
 
@@ -81,13 +81,13 @@
   </section>
 
   <script>
-    // Константы
+    // РљРѕРЅСЃС‚Р°РЅС‚С‹
     const API_URL = 'https://script.google.com/macros/s/AKfycbw8aLams3GM9rRNNAhhVQmWnXIt7sDlzLUsXDsSWh2OVg6_eX8_wD0hFKHsmd0IYsRx/exec';
     const STATUS_FIELD = 'Статус';
-    const DEFAULT_FUNNEL_ORDER = ['Лид', 'Ожидаем оплату', 'Заказ оформлен', 'Отгружено', 'Закрыто', 'Отказ', 'Корзина'];
-    const LIVE_SYNC_MS = 8000; // период опроса сервера
+    const DEFAULT_FUNNEL_ORDER = ['Р›РёРґ', 'РћР¶РёРґР°РµРј РѕРїР»Р°С‚Сѓ', 'Р—Р°РєР°Р· РѕС„РѕСЂРјР»РµРЅ', 'РћС‚РіСЂСѓР¶РµРЅРѕ', 'Р—Р°РєСЂС‹С‚Рѕ', 'РћС‚РєР°Р·', 'РљРѕСЂР·РёРЅР°'];
+    const LIVE_SYNC_MS = 8000; // РїРµСЂРёРѕРґ РѕРїСЂРѕСЃР° СЃРµСЂРІРµСЂР°
 
-    // Состояние
+    // РЎРѕСЃС‚РѕСЏРЅРёРµ
     const $  = (sel,root=document)=>root.querySelector(sel);
     const $$ = (sel,root=document)=>Array.from(root.querySelectorAll(sel));
     const state = {
@@ -100,7 +100,7 @@
     let DRAGGING = false;
 
     function showApp(on){ $('#gate').classList.toggle('hidden', on); $('#app').classList.toggle('hidden', !on); }
-    function overlay(on, text){ const o=$('#overlay'); $('#overlayText').textContent=text||'Загрузка…'; o.classList.toggle('hidden', !on); o.classList.toggle('flex', on); }
+    function overlay(on, text){ const o=$('#overlay'); $('#overlayText').textContent=text||'Р—Р°РіСЂСѓР·РєР°вЂ¦'; o.classList.toggle('hidden', !on); o.classList.toggle('flex', on); }
 
     // API helper
     async function api(action, payload={}){
@@ -110,7 +110,7 @@
         const txt = await r.text(); let data; try { data = JSON.parse(txt); } catch { return { ok:false, error:'bad_json', raw:txt }; }
         if (!data.ok && data.error === 'unauthorized'){
           state.token=''; localStorage.removeItem('crm_token');
-          const err = $('#gateMsg'); if (err){ err.textContent = 'Сессия истекла. Войдите снова.'; err.classList.remove('hidden'); }
+          const err = $('#gateMsg'); if (err){ err.textContent = 'РЎРµСЃСЃРёСЏ РёСЃС‚РµРєР»Р°. Р’РѕР№РґРёС‚Рµ СЃРЅРѕРІР°.'; err.classList.remove('hidden'); }
           showApp(false);
         }
         return data;
@@ -120,7 +120,7 @@
     function effectiveStatusKey(){ return state.statusKey || STATUS_FIELD; }
     function rowsVersion(rows){ const k = effectiveStatusKey(); return (rows||[]).map(r=> String(r && r.id)+'|'+String((r && r[k])||'')).join('~'); }
     function startLiveSync(){ stopLiveSync(); state.rowsVer = rowsVersion(state.rows||[]); state.liveTimer = setInterval(()=> tickLiveSync(false), LIVE_SYNC_MS); }
-    function stopLiveSync(){ try { if (state.liveTimer){ clearInterval(state.liveTimer); state.liveTimer=null; } } catch(_){}
+    function stopLiveSync(){ try { if (state.liveTimer){ clearInterval(state.liveTimer); state.liveTimer=null; } } catch(_){} }
     async function tickLiveSync(force){
       if (!state.token) return; if (document.hidden && !force) return; if (DRAGGING) return;
       const res = await api('list', { token: state.token }); if (!res.ok) return;
@@ -128,7 +128,7 @@
       if (ver !== state.rowsVer){ state.rows = next; renderBoard(); state.rowsVer = ver; }
     }
 
-    // Канал мгновенной синхронизации между вкладками
+    // РљР°РЅР°Р» РјРіРЅРѕРІРµРЅРЅРѕР№ СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё РјРµР¶РґСѓ РІРєР»Р°РґРєР°РјРё
     let bc = null; try { if ('BroadcastChannel' in window){ bc = new BroadcastChannel('crm_sync'); bc.onmessage = (ev)=>{ const m=ev.data||{}; if (m.t==='status') applyIncomingStatus(m.id, m.status); }; } } catch(_){ }
     window.addEventListener('storage', (e)=>{ if (e.key==='crm_sync_msg' && e.newValue){ try { const m = JSON.parse(e.newValue); if (m && m.t==='status') applyIncomingStatus(m.id, m.status); } catch(_){} } });
     function broadcastStatusChange(id, status){ try { if (bc) bc.postMessage({ t:'status', id, status }); localStorage.setItem('crm_sync_msg', JSON.stringify({ t:'status', id, status, ts:Date.now() })); } catch(_){} }
@@ -139,7 +139,7 @@
       const order = [];
       DEFAULT_FUNNEL_ORDER.forEach(s=>{ if (uniq.includes(s)) order.push(s); });
       uniq.forEach(s=>{ if (!order.includes(s)) order.push(s); });
-      if (!order.length) order.push('Лид');
+      if (!order.length) order.push('Р›РёРґ');
       return order;
     }
 
@@ -154,7 +154,7 @@
           <div class="flex items-center justify-between mb-2">
             <div class="font-semibold">${col}</div>
             <div class="flex items-center gap-2">
-              ${idx===0? '<button class="addLead px-2 py-1 text-xs rounded-md bg-black text-white">Новый лид</button>':''}
+              ${idx===0? '<button class="addLead px-2 py-1 text-xs rounded-md bg-black text-white">РќРѕРІС‹Р№ Р»РёРґ</button>':''}
               <div class="text-xs text-slate-600 count">${items.length}</div>
             </div>
           </div>
@@ -171,14 +171,14 @@
       const card = document.createElement('div');
       card.className = 'card bg-slate-50 text-slate-900 border rounded-lg p-2 transition hover:shadow-md';
       card.dataset.id = row.id;
-      const title = String(row['Наименование детали ']||'');
-      const phone = String(row['Телефон клиента']||'');
-      const price = String(row['Цена,$']||'');
+      const title = String(row['РќР°РёРјРµРЅРѕРІР°РЅРёРµ РґРµС‚Р°Р»Рё ']||'');
+      const phone = String(row['РўРµР»РµС„РѕРЅ РєР»РёРµРЅС‚Р°']||'');
+      const price = String(row['Р¦РµРЅР°,$']||'');
       card.innerHTML = `
         <div class="flex items-start gap-2">
           <div class="drag-handle sm:hidden -m-2 mr-1 px-1 py-2 w-6 shrink-0 self-stretch flex items-center justify-center text-slate-400 cursor-grab active:cursor-grabbing">
             <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9 5a1 1 0 1 1-2 0a1 1 0 0 1 2 0m0 14a1 1 0 1 1-2 0a1 1 0 0 1 2 0m0-7a1 1 0 1 1-2 0a1 1 0 0 1 2 0m8-7a1 1 0 1 1-2 0a1 1 0 0 1 2 0m0 14a1 1 0 1 1-2 0a1 1 0 0 1 2 0m0-7a1 1 0 1 1-2 0a1 1 0 0 1 2 0"/></svg>
-            <span class="sr-only">Перетащить</span>
+            <span class="sr-only">РџРµСЂРµС‚Р°С‰РёС‚СЊ</span>
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between gap-2">
@@ -221,7 +221,7 @@
     async function handleMove(evt){
       const card = evt.item; const id = card?.dataset?.id; const newStatus = (evt.to?.dataset?.status||'').trim();
       if (!id || !newStatus) return;
-      // локально обновим счётчики
+      // Р»РѕРєР°Р»СЊРЅРѕ РѕР±РЅРѕРІРёРј СЃС‡С‘С‚С‡РёРєРё
       const oldHeader = evt.from?.parentElement?.querySelector('.count');
       const newHeader = evt.to?.parentElement?.querySelector('.count');
       if (oldHeader) oldHeader.textContent = Math.max(0, (+oldHeader.textContent - 1));
@@ -231,11 +231,11 @@
       const k = effectiveStatusKey();
       const prevStatus = row ? row[k] : null; if (row) row[k] = newStatus;
 
-      overlay(true, 'Сохранение…');
+      overlay(true, 'РЎРѕС…СЂР°РЅРµРЅРёРµвЂ¦');
       const res = await api('update', { id, row: { [k]: newStatus }, token: state.token });
       overlay(false);
       if (!res.ok){
-        // Откат
+        // РћС‚РєР°С‚
         if (row) row[k] = prevStatus;
         try {
           const revertIndex = (typeof evt.oldDraggableIndex === 'number') ? evt.oldDraggableIndex : evt.oldIndex;
@@ -243,45 +243,45 @@
           if (oldHeader) oldHeader.textContent = (+oldHeader.textContent + 1);
           if (newHeader) newHeader.textContent = Math.max(0, (+newHeader.textContent - 1));
         } catch(_){}
-        alert('Ошибка перемещения. Статус не сохранён.');
+        alert('РћС€РёР±РєР° РїРµСЂРµРјРµС‰РµРЅРёСЏ. РЎС‚Р°С‚СѓСЃ РЅРµ СЃРѕС…СЂР°РЅС‘РЅ.');
         return;
       }
-      // Успех: небольшая рассылка и обновление версии
+      // РЈСЃРїРµС…: РЅРµР±РѕР»СЊС€Р°СЏ СЂР°СЃСЃС‹Р»РєР° Рё РѕР±РЅРѕРІР»РµРЅРёРµ РІРµСЂСЃРёРё
       state.rowsVer = rowsVersion(state.rows||[]);
       broadcastStatusChange(id, newStatus);
     }
 
     async function addLead(){
-      const first = statusOrder(state.rows)[0] || 'Лид';
-      overlay(true, 'Создание…');
+      const first = statusOrder(state.rows)[0] || 'Р›РёРґ';
+      overlay(true, 'РЎРѕР·РґР°РЅРёРµвЂ¦');
       const res = await api('create', { row: { [STATUS_FIELD]: first }, token: state.token });
       overlay(false);
-      if (!res.ok) return alert('Не удалось создать лид');
+      if (!res.ok) return alert('РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ Р»РёРґ');
       state.rows.unshift(res.row);
       state.rowsVer = rowsVersion(state.rows||[]);
       renderBoard();
       broadcastStatusChange(res.row.id, first);
     }
 
-    // Поиск по карточкам
+    // РџРѕРёСЃРє РїРѕ РєР°СЂС‚РѕС‡РєР°Рј
     $('#search').addEventListener('input', ()=>{
       const q = $('#search').value.trim().toLowerCase();
       $$('#board .card').forEach(c=>c.classList.remove('hidden'));
       if (!q) return;
       state.rows.forEach(r=>{
-        const hay = [r['Телефон клиента'], r['Наименование детали '], r['Коментарий']].map(x => String(x||'').toLowerCase()).join(' ');
+        const hay = [r['РўРµР»РµС„РѕРЅ РєР»РёРµРЅС‚Р°'], r['РќР°РёРјРµРЅРѕРІР°РЅРёРµ РґРµС‚Р°Р»Рё '], r['РљРѕРјРµРЅС‚Р°СЂРёР№']].map(x => String(x||'').toLowerCase()).join(' ');
         if (!hay.includes(q)){ const el = $(`#board .card[data-id="${CSS.escape(r.id)}"]`); if (el) el.classList.add('hidden'); }
       });
     });
 
-    // Вход / выход
+    // Р’С…РѕРґ / РІС‹С…РѕРґ
     $('#doLogin').onclick = async (ev)=>{
       ev.preventDefault(); const pwd = $('#pwd').value.trim(); const err = $('#gateMsg'); err.classList.add('hidden'); err.textContent='';
-      if (!pwd){ err.textContent='Введите пароль'; err.classList.remove('hidden'); return; }
-      overlay(true, 'Вход…');
+      if (!pwd){ err.textContent='Р’РІРµРґРёС‚Рµ РїР°СЂРѕР»СЊ'; err.classList.remove('hidden'); return; }
+      overlay(true, 'Р’С…РѕРґвЂ¦');
       const r = await api('auth', { password: pwd });
       overlay(false);
-      if (!r.ok){ err.textContent='Неверный пароль'; err.classList.remove('hidden'); return; }
+      if (!r.ok){ err.textContent='РќРµРІРµСЂРЅС‹Р№ РїР°СЂРѕР»СЊ'; err.classList.remove('hidden'); return; }
       state.token = r.token; localStorage.setItem('crm_token', state.token);
       showApp(true); renderSkeleton(); void loadData();
     };
@@ -292,12 +292,12 @@
 
     async function loadData(){
       const res = await api('list', { token: state.token });
-      if (!res.ok) { alert('Не удалось загрузить данные'); return; }
+      if (!res.ok) { alert('РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РґР°РЅРЅС‹Рµ'); return; }
       state.rows = res.rows || [];
       renderBoard(); startLiveSync();
     }
 
-    // Автозапуск
+    // РђРІС‚РѕР·Р°РїСѓСЃРє
     (async function bootstrap(){ if (state.token){ showApp(true); renderSkeleton(); void loadData(); } })();
   </script>
 </body>
