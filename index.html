@@ -3,72 +3,38 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CRM Воронка — Google Sheets</title>
+  <title>RepPart CRM</title>
 
-  <!-- PWA / иконки -->
   <link rel="icon" href="favicon.png" type="image/png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="manifest.webmanifest">
+
   <meta name="theme-color" content="#000000">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="RepPart CRM">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-  <!-- === НАСТРОЙКИ === -->
-  <script>
-    const API_URL = 'https://script.google.com/macros/s/AKfycbw8aLams3GM9rRNNAhhVQmWnXIt7sDlzLUsXDsSWh2OVg6_eX8_wD0hFKHsmd0IYsRx/exec';
-    const STATUS_FIELD = 'Статус';
-    const FUNNEL_COLUMNS = ['Обращение (Лид)','Заказ оформлен','Ожидаем оплату','На доставке','Отгружен','Помойка'];
-    const OPTIONAL_MANAGER_FIELD = 'Менеджер';
-  </script>
-
-  <!-- Tailwind -->
+  <!-- Tailwind (для простоты; можно заменить на локальную сборку) -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- SortableJS -->
+  <!-- SortableJS для DnD -->
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-
   <style>
-    body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
     dialog::backdrop { background: rgba(0,0,0,.35); }
-
-    /* зона дропа: на десктопе оставим высоту, на мобилке выключим */
+    .card { user-select: none; -webkit-user-drag: none; touch-action: pan-y; }
+    .drag-handle { -webkit-user-drag: none; user-select: none; touch-action: none; }
     .col-drop { min-height: 180px; }
     @media (max-width: 640px){
-      .col-drop { min-height: 0; }             /* <-- ключевой фикс растягивания */
-      #board { display: block; }                /* последовательные блоки */
-      #board > div { margin-bottom: .75rem; }   /* небольшой отступ между колонками */
-    }
-
-    /* карточки — приятнее тянуть */
-    .card { user-select: none; -webkit-user-drag: none; will-change: transform; }
-
-    /* Скелетон */
-    .shimmer { position: relative; overflow: hidden; background: #e5e7eb; border-radius: .5rem; }
-    .shimmer::after{
-      content:''; position:absolute; inset:0; transform: translateX(-100%);
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent);
-      animation: shimmer 1.2s infinite;
-    }
-    @keyframes shimmer { 100% { transform: translateX(100%); } }
-
-    /* Диалог на мобиле — фуллскрин */
-    @media (max-width: 640px){
+      .col-drop { min-height: 0; }
+      #board { display: block; }
+      #board > div { margin-bottom: .75rem; }
       dialog { width: 100vw !important; max-width: 100vw !important; height: 100vh; border-radius: 0 !important; }
     }
-</style>
-  <style>
-    /* Mobile drag handle and touch improvements */
-    .card { touch-action: pan-y; }
-    .drag-handle { -webkit-user-drag: none; user-select: none; touch-action: none; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
 
-  <!-- Оверлей-лоадер -->
+  <!-- Оверлей загрузки -->
   <div id="overlay" class="fixed inset-0 hidden z-50 items-center justify-center bg-black/30 backdrop-blur-sm">
     <div class="bg-white rounded-xl shadow-xl px-4 py-3 flex items-center gap-3">
       <svg width="20" height="20" viewBox="0 0 24 24" class="animate-spin text-slate-700"><path fill="currentColor" d="M12 2a1 1 0 0 1 1 1v2a1 1 0 1 1-2 0V3a1 1 0 0 1 1-1m7.07 3.93a1 1 0 0 1 0 1.41l-1.42 1.42a1 1 0 1 1-1.41-1.41l1.41-1.42a1 1 0 0 1 1.42 0M21 11a1 1 0 0 1 1 1a9.99 9.99 0 0 1-10 10a1 1 0 1 1 0-2a8 8 0 0 0 8-8a1 1 0 0 1 1-1"/></svg>
@@ -76,176 +42,138 @@
     </div>
   </div>
 
-  <!-- Логин -->
+  <!-- Экран входа -->
   <section id="gate" class="min-h-screen flex items-center justify-center p-4">
-    <div class="w-full max-w-md bg-white border rounded-2xl shadow-xl p-6 animate-[fadeIn_.4s_ease]">
-      <h1 class="text-2xl font-bold mb-1">Вход в CRM</h1>
-      <p class="text-sm text-slate-600 mb-4">Введите пароль, чтобы открыть воронку.</p>
+    <div class="w-full max-w-md bg-white border rounded-2xl shadow-xl p-6">
+      <h1 class="text-2xl font-bold mb-2">Вход в CRM</h1>
+      <p class="text-sm text-slate-600 mb-4">Введите пароль доступа.</p>
       <label class="block text-sm text-slate-600 mb-1">Пароль</label>
-      <input id="pwd" type="password" class="w-full border rounded-lg px-3 py-2 mb-3 bg-white text-slate-900" placeholder="••••••••" />
-      <button id="doLogin" class="w-full px-3 py-2 rounded-lg bg-black text-white transition active:scale-[.98]">Войти</button>
-      <pre id="gateMsg" class="hidden mt-3 text-sm text-red-600 whitespace-pre-wrap"></pre>
+      <input id="pwd" type="password" class="w-full border rounded px-3 py-2 mb-2" />
+      <div id="gateMsg" class="hidden text-sm text-red-600 mb-3"></div>
+      <button id="doLogin" class="w-full px-3 py-2 rounded-lg bg-black text-white">Войти</button>
     </div>
   </section>
 
   <!-- Приложение -->
-  <main id="app" class="hidden">
-    <div class="max-w-[1400px] mx-auto p-4">
-      <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-        <div class="flex items-center justify-between sm:justify-start gap-3">
-          <h2 class="text-2xl font-bold">CRM-воронка</h2>
-          <span class="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">Редактирование включено</span>
-        </div>
-        <div class="flex gap-2 w-full sm:w-auto">
-          <input id="search" placeholder="Поиск по телефону / детали / комментарию"
-                 class="px-3 py-2 rounded-lg bg-white border text-slate-900 flex-1 sm:w-80" />
-          <button id="btnLogout" class="px-3 py-2 rounded-lg bg-white border">Выйти</button>
-        </div>
-      </header>
-
-      <!-- Скелетон при загрузке -->
-      <div id="skeleton" class="mb-2">
-        <div class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3"></div>
+  <section id="app" class="hidden p-3 sm:p-4 max-w-7xl mx-auto">
+    <div class="flex items-center justify-between gap-3 mb-3">
+      <div class="font-bold text-xl">RepPart CRM</div>
+      <div class="flex items-center gap-2">
+        <input id="search" placeholder="Поиск" class="border rounded px-2 py-1 text-sm" />
+        <button id="btnLogout" class="px-2 py-1 text-sm rounded border">Выйти</button>
       </div>
-
-      <!-- Доска: мобилка — столбцы друг под другом -->
-      <section id="board" class="hidden grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3"></section>
     </div>
-  </main>
 
-  <!-- Модалка карточки -->
-  <dialog id="dlgCard" class="p-0 rounded-xl w-[760px] max-w-[95vw]">
-    <form method="dialog" class="p-5 bg-white text-slate-900 rounded-xl shadow-xl border animate-[fadeIn_.2s_ease]">
-      <h3 class="text-lg font-semibold mb-3">Карточка</h3>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-        <div><label class="block text-slate-600">п/п</label><input id="f_id" class="w-full border rounded px-2 py-1 bg-slate-100" disabled /></div>
-        <div><label class="block text-slate-600">Дата заказа</label><input id="f_date" class="w-full border rounded px-2 py-1 bg-white text-slate-900" placeholder="2025-10-13" /></div>
-        <div><label class="block text-slate-600">Телефон клиента</label><input id="f_phone" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
-        <div><label class="block text-slate-600">Цена,$</label><input id="f_price" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
-        <div class="sm:col-span-2"><label class="block text-slate-600">Наименование детали</label><input id="f_title" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
-        <div class="sm:col-span-2"><label class="block text-slate-600">Артикул поставщика</label><input id="f_art" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
-        <div class="sm:col-span-2"><label class="block text-slate-600">Ссылка</label><input id="f_link" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
-        <div><label class="block text-сlate-600">Продажа</label><input id="f_sale" class="w-full border rounded px-2 py-1 bg-white text-slate-900" /></div>
-        <div><label class="block text-сlate-600">Закупка</label><input id="f_buy" class="w-full border rounded px-2 py-1 bg-white text-сlate-900" /></div>
-        <div><label class="block text-сlate-600">Касса</label><input id="f_cash" class="w-full border rounded px-2 py-1 bg-white text-сlate-900" /></div>
-        <div><label class="block text-сlate-600">Логисты</label><input id="f_log" class="w-full border rounded px-2 py-1 bg-white text-сlate-900" /></div>
-        <div><label class="block text-сlate-600">Возврат клиенту</label><input id="f_refc" class="w-full border rounded px-2 py-1 bg-white text-сlate-900" /></div>
-        <div><label class="block text-сlate-600">Возврат от поставщика</label><input id="f_refp" class="w-full border rounded px-2 py-1 bg-white text-сlate-900" /></div>
-        <div><label class="block text-сlate-600">Прибыль с заказа</label><input id="f_profit" class="w-full border rounded px-2 py-1 bg-white text-сlate-900" /></div>
-        <div><label class="block text-сlate-600">Статус</label><select id="f_status" class="w-full border rounded px-2 py-1 bg-white text-сlate-900"></select></div>
-        <div class="sm:col-span-2"><label class="block text-сlate-600">Коментарий</label><textarea id="f_comment" class="w-full border rounded px-2 py-1 bg-white text-сlate-900" rows="3"></textarea></div>
-        <div class="sm:col-span-2" id="managerRow" style="display:none"><label class="block text-сlate-600">Менеджер</label><input id="f_manager" class="w-full border rounded px-2 py-1 bg-white text-сlate-900" /></div>
-      </div>
-      <div class="flex justify-between mt-4">
-        <button id="btnDelete" class="px-3 py-2 rounded-lg border bg-white" value="cancel">Перенести в «Помойка»</button>
-        <div class="flex gap-2">
-          <button class="px-3 py-2 rounded-lg border bg-white" value="cancel">Закрыть</button>
-          <button id="btnSave" class="px-3 py-2 rounded-lg bg-black text-white">Сохранить</button>
+    <div id="skeleton">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="bg-white border rounded-2xl p-3">
+          <div class="h-5 w-40 bg-slate-200 rounded mb-3"></div>
+          <div class="space-y-3">
+            <div class="h-16 bg-slate-200 rounded"></div>
+            <div class="h-16 bg-slate-200 rounded"></div>
+            <div class="h-16 bg-slate-200 rounded"></div>
+          </div>
         </div>
       </div>
-    </form>
-  </dialog>
+    </div>
+
+    <div id="board" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3"></div>
+  </section>
 
   <script>
+    // Константы
+    const API_URL = 'https://script.google.com/macros/s/AKfycbw8aLams3GM9rRNNAhhVQmWnXIt7sDlzLUsXDsSWh2OVg6_eX8_wD0hFKHsmd0IYsRx/exec';
+    const STATUS_FIELD = 'Статус';
+    const DEFAULT_FUNNEL_ORDER = ['Лид', 'Ожидаем оплату', 'Заказ оформлен', 'Отгружено', 'Закрыто', 'Отказ', 'Корзина'];
+    const LIVE_SYNC_MS = 8000; // период опроса сервера
+
+    // Состояние
     const $  = (sel,root=document)=>root.querySelector(sel);
     const $$ = (sel,root=document)=>Array.from(root.querySelectorAll(sel));
-    const state = { rows: [], token: localStorage.getItem('crm_token')||'', hasManager:false, statusKey: STATUS_FIELD };
+    const state = {
+      rows: [],
+      token: localStorage.getItem('crm_token') || '',
+      statusKey: STATUS_FIELD,
+      liveTimer: null,
+      rowsVer: ''
+    };
     let DRAGGING = false;
-    const inflightMove = Object.create(null);
-    const pendingMove  = Object.create(null);
 
     function showApp(on){ $('#gate').classList.toggle('hidden', on); $('#app').classList.toggle('hidden', !on); }
-    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
     function overlay(on, text){ const o=$('#overlay'); $('#overlayText').textContent=text||'Загрузка…'; o.classList.toggle('hidden', !on); o.classList.toggle('flex', on); }
 
-    async function api(action, payload = {}) {
+    // API helper
+    async function api(action, payload={}){
       const body = { action, ...payload };
       try {
         const r = await fetch(API_URL, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
         const txt = await r.text(); let data; try { data = JSON.parse(txt); } catch { return { ok:false, error:'bad_json', raw:txt }; }
-        if (!data.ok && data.error === 'unauthorized') {
-          try {
-            console.warn('Unauthorized; forcing re-login');
-            state.token = '';
-            localStorage.removeItem('crm_token');
-            const err = $('#gateMsg'); if (err){ err.textContent = 'Сессия истекла. Войдите снова.'; err.classList.remove('hidden'); }
-            showApp(false);
-          } catch(_){ }
+        if (!data.ok && data.error === 'unauthorized'){
+          state.token=''; localStorage.removeItem('crm_token');
+          const err = $('#gateMsg'); if (err){ err.textContent = 'Сессия истекла. Войдите снова.'; err.classList.remove('hidden'); }
+          showApp(false);
         }
         return data;
-      } catch (err) { return { ok:false, error:'network', detail:String(err) }; }
+      } catch(err){ return { ok:false, error:'network', detail:String(err) }; }
     }
 
-    function renderSkeleton() {
-      const wrap = $('#skeleton > div'); if (!wrap) return;
-      wrap.innerHTML = '';
-      for (let i=0;i<FUNNEL_COLUMNS.length;i++){
-        const col = document.createElement('div');
-        col.className = 'bg-white border rounded-2xl p-3';
-        col.innerHTML = `
-          <div class="h-5 w-40 shimmer mb-3"></div>
-          <div class="space-y-3">
-            <div class="h-16 shimmer rounded-lg"></div>
-            <div class="h-16 shimmer rounded-lg"></div>
-            <div class="h-16 shimmer rounded-lg"></div>
-          </div>`;
-        wrap.appendChild(col);
-      }
+    function effectiveStatusKey(){ return state.statusKey || STATUS_FIELD; }
+    function rowsVersion(rows){ const k = effectiveStatusKey(); return (rows||[]).map(r=> String(r && r.id)+'|'+String((r && r[k])||'')).join('~'); }
+    function startLiveSync(){ stopLiveSync(); state.rowsVer = rowsVersion(state.rows||[]); state.liveTimer = setInterval(()=> tickLiveSync(false), LIVE_SYNC_MS); }
+    function stopLiveSync(){ try { if (state.liveTimer){ clearInterval(state.liveTimer); state.liveTimer=null; } } catch(_){}
+    async function tickLiveSync(force){
+      if (!state.token) return; if (document.hidden && !force) return; if (DRAGGING) return;
+      const res = await api('list', { token: state.token }); if (!res.ok) return;
+      const next = res.rows || []; const ver = rowsVersion(next);
+      if (ver !== state.rowsVer){ state.rows = next; renderBoard(); state.rowsVer = ver; }
+    }
+
+    // Канал мгновенной синхронизации между вкладками
+    let bc = null; try { if ('BroadcastChannel' in window){ bc = new BroadcastChannel('crm_sync'); bc.onmessage = (ev)=>{ const m=ev.data||{}; if (m.t==='status') applyIncomingStatus(m.id, m.status); }; } } catch(_){ }
+    window.addEventListener('storage', (e)=>{ if (e.key==='crm_sync_msg' && e.newValue){ try { const m = JSON.parse(e.newValue); if (m && m.t==='status') applyIncomingStatus(m.id, m.status); } catch(_){} } });
+    function broadcastStatusChange(id, status){ try { if (bc) bc.postMessage({ t:'status', id, status }); localStorage.setItem('crm_sync_msg', JSON.stringify({ t:'status', id, status, ts:Date.now() })); } catch(_){} }
+    function applyIncomingStatus(id, status){ const k=effectiveStatusKey(); const row = state.rows.find(r=> String(r.id)===String(id)); if (!row) return; if (String(row[k])===String(status)) return; row[k]=status; state.rowsVer = rowsVersion(state.rows||[]); renderBoard(); }
+
+    function statusOrder(all){
+      const uniq = Array.from(new Set((all||[]).map(r => String((r && r[effectiveStatusKey()])||'').trim()).filter(Boolean)));
+      const order = [];
+      DEFAULT_FUNNEL_ORDER.forEach(s=>{ if (uniq.includes(s)) order.push(s); });
+      uniq.forEach(s=>{ if (!order.includes(s)) order.push(s); });
+      if (!order.length) order.push('Лид');
+      return order;
     }
 
     function renderBoard(){
-      const board = $('#board'); board.innerHTML = '';
-      FUNNEL_COLUMNS.forEach((col, idx) => {
-        const colBox = document.createElement('div');
-        colBox.className = 'bg-white text-slate-900 border rounded-2xl p-3';
-
-        const isLead = (idx === 0);
-        colBox.innerHTML = `
+      const board = $('#board'); board.innerHTML='';
+      const cols = statusOrder(state.rows);
+      board.className = 'grid grid-cols-1 ' + (cols.length>=3? 'sm:grid-cols-3':'sm:grid-cols-2') + ' gap-3';
+      cols.forEach((col, idx)=>{
+        const box = document.createElement('div'); box.className = 'bg-white border rounded-2xl p-3';
+        const items = state.rows.filter(r=> String(r[effectiveStatusKey()]||'').trim()===col);
+        box.innerHTML = `
           <div class="flex items-center justify-between mb-2">
             <div class="font-semibold">${col}</div>
             <div class="flex items-center gap-2">
-              ${isLead ? '<button class="addLead px-2 py-1 text-xs rounded-md bg-black text-white">Добавить лид</button>' : ''}
-              <div class="text-xs text-slate-600 count">0</div>
+              ${idx===0? '<button class="addLead px-2 py-1 text-xs rounded-md bg-black text-white">Новый лид</button>':''}
+              <div class="text-xs text-slate-600 count">${items.length}</div>
             </div>
           </div>
-          <div class="col-drop space-y-2" data-status="${col}"></div>
-        `;
-        const drop = colBox.querySelector('.col-drop');
-        const items = state.rows.filter(r => String(r['Статус']||'').trim() === col);
-        items.forEach(row => drop.appendChild(renderCard(row)));
-        colBox.querySelector('.count').textContent = items.length;
-        if (isLead) colBox.querySelector('.addLead').onclick = addLead;
-        board.appendChild(colBox);
+          <div class="col-drop space-y-2" data-status="${col}"></div>`;
+        const drop = box.querySelector('.col-drop'); items.forEach(r=> drop.appendChild(renderCard(r)));
+        if (idx===0){ box.querySelector('.addLead').onclick = addLead; }
+        board.appendChild(box);
       });
       setupDnD();
-    }
-
-    // Определяем ключ поля статуса по значению, совпадающему с одним из столбцов воронки
-    function getStatusFieldKey(sample){
-      if (sample && typeof sample === 'object'){
-        for (const k of Object.keys(sample||{})){
-          const v = (sample[k]||'').toString().trim();
-          if (FUNNEL_COLUMNS.includes(v)) return k;
-        }
-      }
-      const any = (state.rows||[]).find(r=>r && typeof r==='object');
-      if (any){
-        for (const k of Object.keys(any)){
-          const v = (any[k]||'').toString().trim();
-          if (FUNNEL_COLUMNS.includes(v)) return k;
-        }
-      }
-      return '';
+      $('#skeleton').classList.add('hidden'); $('#board').classList.remove('hidden');
     }
 
     function renderCard(row){
       const card = document.createElement('div');
-      card.className = 'card bg-slate-50 text-slate-900 border rounded-lg p-2 cursor-move transition hover:shadow-md';
+      card.className = 'card bg-slate-50 text-slate-900 border rounded-lg p-2 transition hover:shadow-md';
       card.dataset.id = row.id;
-      const title = (row['Наименование детали']||'').toString();
-      const phone = (row['Телефон клиента']||'').toString();
-      const price = (row['Цена,$']||'').toString();
-      const manager = state.hasManager ? (row[OPTIONAL_MANAGER_FIELD]||'') : '';
+      const title = String(row['Наименование детали ']||'');
+      const phone = String(row['Телефон клиента']||'');
+      const price = String(row['Цена,$']||'');
       card.innerHTML = `
         <div class="flex items-start gap-2">
           <div class="drag-handle sm:hidden -m-2 mr-1 px-1 py-2 w-6 shrink-0 self-stretch flex items-center justify-center text-slate-400 cursor-grab active:cursor-grabbing">
@@ -254,23 +182,20 @@
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between gap-2">
-              <div class="text-sm font-semibold line-clamp-2">${escapeHtml(title)}</div>
-              <div class="text-xs text-slate-600">$${escapeHtml(price)}</div>
+              <div class="text-sm font-semibold line-clamp-2">${title}</div>
+              <div class="text-xs text-slate-600">$${price}</div>
             </div>
             <div class="mt-1 flex items-center justify-between text-xs text-slate-700">
-              <div class="truncate">${escapeHtml(phone)}</div>
-              ${manager?`<div class=\"px-2 py-0.5 bg-slate-200 rounded-full\">${escapeHtml(manager)}</div>`:''}
+              <div class="truncate">${phone}</div>
             </div>
           </div>
         </div>`;
-      card.addEventListener('click', ()=>{ if (!DRAGGING) openCard(row.id); });
-      const h = card.querySelector('.drag-handle');
-      if (h){ h.addEventListener('click', e=> e.stopPropagation()); }
+      const h = card.querySelector('.drag-handle'); if (h){ h.addEventListener('click', e=> e.stopPropagation()); }
       return card;
     }
 
     function setupDnD(){
-      const useHandle = (window.matchMedia && window.matchMedia('(max-width: 640px)').matches) ? true : false;
+      const useHandle = window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
       $$('.col-drop').forEach(el => {
         if (el._sortable && typeof el._sortable.destroy === 'function') el._sortable.destroy();
         const opts = {
@@ -281,252 +206,100 @@
           fallbackTolerance: 6,
           emptyInsertThreshold: 5,
           ghostClass: 'opacity-60',
-          // Use single-token classes to avoid DOMTokenList.add errors
           chosenClass: 'ring-slate-300',
           dragClass: 'ring-2',
           onStart(){ DRAGGING = true; },
-          // Only handle cross-column moves once via `onAdd` to avoid double-processing
-          onEnd(evt){ setTimeout(()=>{ DRAGGING = false; }, 150); },
+          onEnd(){ setTimeout(()=>{ DRAGGING = false; }, 150); },
           onAdd: handleMove,
         };
         if (useHandle) opts.handle = '.drag-handle';
         el._sortable = new Sortable(el, opts);
       });
     }
-
-    // Reconfigure DnD on viewport changes to toggle mobile handle
-    try {
-      window.addEventListener('resize', ()=>{ try { setupDnD(); } catch(_){} });
-      window.addEventListener('orientationchange', ()=>{ try { setupDnD(); } catch(_){} });
-    } catch(_){ }
+    try { window.addEventListener('resize', ()=> setupDnD()); window.addEventListener('orientationchange', ()=> setupDnD()); } catch(_){}
 
     async function handleMove(evt){
-      const card = evt.item;
-      const id = card?.dataset?.id;
-      const newStatus = (evt.to?.dataset?.status || '').trim();
+      const card = evt.item; const id = card?.dataset?.id; const newStatus = (evt.to?.dataset?.status||'').trim();
       if (!id || !newStatus) return;
-
-      const row = state.rows.find(r => String(r.id) === String(id));
-      try { console.log('rowKeys', Object.keys(row||{})); } catch(_){ }
-      const statusKeyDetected = getStatusFieldKey(row||{});
-      const prevStatusDetected = (row && statusKeyDetected) ? row[statusKeyDetected] : undefined;
-      try { console.log('statusKeyDetected', statusKeyDetected, 'prev', prevStatusDetected, '->', newStatus); } catch(_){ }
-      if (row && statusKeyDetected) row[statusKeyDetected] = newStatus;
-      if (!state.statusKey && statusKeyDetected) state.statusKey = statusKeyDetected;
-      const prevStatus = row ? row['Статус'] : null;
-
-      if (row) row['Статус'] = newStatus;
-
+      // локально обновим счётчики
       const oldHeader = evt.from?.parentElement?.querySelector('.count');
       const newHeader = evt.to?.parentElement?.querySelector('.count');
       if (oldHeader) oldHeader.textContent = Math.max(0, (+oldHeader.textContent - 1));
       if (newHeader) newHeader.textContent = (+newHeader.textContent + 1);
 
-      if (inflightMove[id]) { pendingMove[id] = newStatus; return; }
+      const row = state.rows.find(r => String(r.id)===String(id));
+      const k = effectiveStatusKey();
+      const prevStatus = row ? row[k] : null; if (row) row[k] = newStatus;
 
-      inflightMove[id] = true;
-      let currentTarget = newStatus;
-      let ok = true;
-
-      while (true) {
-        const statusKey0 = getStatusFieldKey(row||{});
-        let res;
-        if (statusKey0) {
-          const patch0 = {}; patch0[statusKey0] = currentTarget;
-          res = await api('update', { id, row: patch0, token: state.token });
-        } else {
-          res = { ok:false };
-        }
-        if (!res.ok) {
-          // Fallback: если бэкенд не поддерживает action "move", пробуем обычный update
-          const statusKey = getStatusFieldKey(row||{});
-          if (statusKey) {
-            const patch = {}; patch[statusKey] = currentTarget;
-            const alt = await api('update', { id, row: patch, token: state.token });
-            if (!alt.ok) { ok = false; break; }
-          } else { ok = false; break; }
-        }
-        if (pendingMove[id] && pendingMove[id] !== currentTarget) {
-          currentTarget = pendingMove[id]; pendingMove[id] = undefined; continue;
-        }
-        break;
-      }
-
-      inflightMove[id] = false;
-      pendingMove[id] = undefined;
-
-      if (!ok) {
-        try { console.error('Move failed', { id, newStatus, prevStatus }); } catch(_){ }
-        if (row && statusKeyDetected) row[statusKeyDetected] = prevStatusDetected;
-        if (row && statusKeyDetected) row[statusKeyDetected] = prevStatusDetected;
-        if (row) row['Статус'] = prevStatus;
+      overlay(true, 'Сохранение…');
+      const res = await api('update', { id, row: { [k]: newStatus }, token: state.token });
+      overlay(false);
+      if (!res.ok){
+        // Откат
+        if (row) row[k] = prevStatus;
         try {
           const revertIndex = (typeof evt.oldDraggableIndex === 'number') ? evt.oldDraggableIndex : evt.oldIndex;
           evt.from.insertBefore(card, (typeof revertIndex === 'number') ? (evt.from.children[revertIndex] || null) : null);
           if (oldHeader) oldHeader.textContent = (+oldHeader.textContent + 1);
           if (newHeader) newHeader.textContent = Math.max(0, (+newHeader.textContent - 1));
         } catch(_){}
-        alert('Ошибка перемещения. Попробуйте ещё раз.');
+        alert('Ошибка перемещения. Статус не сохранён.');
+        return;
       }
+      // Успех: небольшая рассылка и обновление версии
+      state.rowsVer = rowsVersion(state.rows||[]);
+      broadcastStatusChange(id, newStatus);
     }
 
     async function addLead(){
-      const row = {
-        'п/п':'','Дата заказа': new Date().toISOString().slice(0,10),
-        'Телефон клиента':'','Цена,$':'','Артикул поставщика':'',
-        'Наименование детали':'Новый лид','Ссылка':'','Касса':'','Продажа':'','Закупка':'','Логисты':'',
-        'Возврат клиенту':'','Возврат от поставщика':'','Прибыль с заказа':'',
-        'Статус': FUNNEL_COLUMNS[0], 'Коментарий':''
-      };
-      try { row[STATUS_FIELD] = FUNNEL_COLUMNS[0]; } catch(_){ }
-      if (state.hasManager) row[OPTIONAL_MANAGER_FIELD] = '';
-      overlay(true,'Создаём лид…');
-      const res = await api('create', { row, token: state.token });
+      const first = statusOrder(state.rows)[0] || 'Лид';
+      overlay(true, 'Создание…');
+      const res = await api('create', { row: { [STATUS_FIELD]: first }, token: state.token });
       overlay(false);
-      if (!res.ok) {
-        const row = state.rows.find(r=>String(r.id)===String(id));
-        const statusKey = getStatusFieldKey(row||{});
-        if (statusKey){
-          const patch = {}; patch[statusKey] = trash;
-          const alt = await api('update', { id, row: patch, token: state.token });
-          if (alt && alt.ok) { try { res.ok = true; } catch(_){} }
-        }
-      }
-      if (!res.ok) return alert('Ошибка создания');
-
+      if (!res.ok) return alert('Не удалось создать лид');
       state.rows.unshift(res.row);
-      const firstCol = $(`.col-drop[data-status="${CSS.escape(FUNNEL_COLUMNS[0])}"]`);
-      if (firstCol) {
-        firstCol.prepend(renderCard(res.row));
-        const cnt = firstCol.parentElement.querySelector('.count');
-        if (cnt) cnt.textContent = (+cnt.textContent + 1);
-        setupDnD();
-      } else {
-        renderBoard();
-      }
-      openCard(res.row.id);
+      state.rowsVer = rowsVersion(state.rows||[]);
+      renderBoard();
+      broadcastStatusChange(res.row.id, first);
     }
 
-    function openCard(id){
-      const row = state.rows.find(r=>String(r.id)===String(id));
-      if (!row) return;
-      $('#f_id').value = row.id || '';
-      $('#f_date').value = row['Дата заказа'] || '';
-      $('#f_phone').value = row['Телефон клиента'] || '';
-      $('#f_price').value = row['Цена,$'] || '';
-      $('#f_title').value = row['Наименование детали'] || '';
-      $('#f_art').value = row['Артикул поставщика'] || '';
-      $('#f_link').value = row['Ссылка'] || '';
-      $('#f_sale').value = row['Продажа'] || '';
-      $('#f_buy').value = row['Закупка'] || '';
-      $('#f_cash').value = row['Касса'] || '';
-      $('#f_log').value = row['Логисты'] || '';
-      $('#f_refc').value = row['Возврат клиенту'] || '';
-      $('#f_refp').value = row['Возврат от поставщика'] || '';
-      $('#f_profit').value = row['Прибыль с заказа'] || '';
-      $('#f_comment').value = row['Коментарий'] || '';
-      const sel = $('#f_status'); sel.innerHTML='';
-      FUNNEL_COLUMNS.forEach(s=>{ const o = document.createElement('option'); o.value=o.textContent=s; if (String(row['Статус'])===s) o.selected=true; sel.appendChild(o); });
-      if (state.hasManager) { $('#managerRow').style.display='block'; $('#f_manager').value = row[OPTIONAL_MANAGER_FIELD]||''; }
-      else { $('#managerRow').style.display='none'; }
-      $('#btnSave').disabled = false; $('#btnDelete').disabled = false; $('#dlgCard').showModal();
-    }
-
-    $('#btnSave').onclick = async (ev)=>{
-      ev.preventDefault();
-      overlay(true,'Сохраняем…');
-      const id = $('#f_id').value;
-      const patch = {
-        'Дата заказа': $('#f_date').value,'Телефон клиента': $('#f_phone').value,'Цена,$': $('#f_price').value,
-        'Наименование детали': $('#f_title').value,'Артикул поставщика': $('#f_art').value,'Ссылка': $('#f_link').value,
-        'Продажа': $('#f_sale').value,'Закупка': $('#f_buy').value,'Касса': $('#f_cash').value,'Логисты': $('#f_log').value,
-        'Возврат клиенту': $('#f_refc').value,'Возврат от поставщика': $('#f_refp').value,'Прибыль с заказа': $('#f_profit').value,
-        'Статус': $('#f_status').value,'Коментарий': $('#f_comment').value,
-      };
-      if (state.hasManager) patch[OPTIONAL_MANAGER_FIELD] = $('#f_manager').value;
-      const res = await api('update', { id, row:patch, token: state.token });
-      overlay(false);
-      if (!res.ok) return alert('Ошибка сохранения' + (res.message?(': '+res.message):''));
-      const idx = state.rows.findIndex(r=>String(r.id)===String(id));
-      
-      if (idx>=0){ state.rows[idx] = res.row; renderBoard(); }
-      $('#dlgCard').close();
-    };
-
-    $('#btnDelete').onclick = async (ev)=>{
-      ev.preventDefault();
-      const id = $('#f_id').value;
-      const trash = FUNNEL_COLUMNS.includes('Помойка') ? 'Помойка' : FUNNEL_COLUMNS.at(-1);
-      if (!confirm('Перенести карточку в «Помойка»?')) return;
-      overlay(true,'Перемещаем…');
-      const rowDel = state.rows.find(r=>String(r.id)===String(id));
-      const statusKeyDel = getStatusFieldKey(rowDel||{});
-      let res;
-      if (statusKeyDel){
-        const patchDel = {}; patchDel[statusKeyDel] = trash;
-        res = await api('update', { id, row: patchDel, token: state.token });
-      } else {
-        res = { ok:false };
-      }
-      overlay(false);
-      if (!res.ok) {
-        const row = state.rows.find(r=>String(r.id)===String(id));
-        const statusKey = getStatusFieldKey(row||{});
-        if (statusKey){
-          const patch = {}; patch[statusKey] = trash;
-          const alt = await api('update', { id, row: patch, token: state.token });
-          if (alt && alt.ok) { try { res.ok = true; } catch(_){} }
-        }
-      }
-      if (!res.ok) return alert('Ошибка операции');
-      const idx = state.rows.findIndex(r=>String(r.id)===String(id));
-      if (idx>=0){ state.rows[idx]['Статус'] = trash; renderBoard(); }
-      $('#dlgCard').close();
-    };
-
-    // Поиск
+    // Поиск по карточкам
     $('#search').addEventListener('input', ()=>{
       const q = $('#search').value.trim().toLowerCase();
       $$('#board .card').forEach(c=>c.classList.remove('hidden'));
       if (!q) return;
       state.rows.forEach(r=>{
-        const hay = [r['Телефон клиента'], r['Наименование детали'], r['Коментарий']]
-          .map(x=>(x||'').toString().toLowerCase()).join(' ');
-        const found = hay.includes(q);
-        if (!found){ const el = $(`#board .card[data-id="${CSS.escape(r.id)}"]`); if (el) el.classList.add('hidden'); }
+        const hay = [r['Телефон клиента'], r['Наименование детали '], r['Коментарий']].map(x => String(x||'').toLowerCase()).join(' ');
+        if (!hay.includes(q)){ const el = $(`#board .card[data-id="${CSS.escape(r.id)}"]`); if (el) el.classList.add('hidden'); }
       });
     });
 
-    // Вход
+    // Вход / выход
     $('#doLogin').onclick = async (ev)=>{
-      ev.preventDefault();
-      const pwd = $('#pwd').value.trim();
-      const err = $('#gateMsg'); err.classList.add('hidden'); err.textContent='';
+      ev.preventDefault(); const pwd = $('#pwd').value.trim(); const err = $('#gateMsg'); err.classList.add('hidden'); err.textContent='';
       if (!pwd){ err.textContent='Введите пароль'; err.classList.remove('hidden'); return; }
-      overlay(true,'Входим…');
+      overlay(true, 'Вход…');
       const r = await api('auth', { password: pwd });
       overlay(false);
-      if (!r.ok) { err.textContent = r.message || r.error || 'Неверный пароль'; err.classList.remove('hidden'); return; }
+      if (!r.ok){ err.textContent='Неверный пароль'; err.classList.remove('hidden'); return; }
       state.token = r.token; localStorage.setItem('crm_token', state.token);
       showApp(true); renderSkeleton(); void loadData();
     };
 
-    $('#btnLogout').onclick = ()=>{ state.token=''; localStorage.removeItem('crm_token'); showApp(false); };
+    $('#btnLogout').onclick = ()=>{ stopLiveSync(); state.token=''; localStorage.removeItem('crm_token'); showApp(false); };
+
+    function renderSkeleton(){ const wrap = $('#skeleton'); if (wrap) { wrap.classList.remove('hidden'); $('#board').classList.add('hidden'); } }
 
     async function loadData(){
       const res = await api('list', { token: state.token });
-      if (!res.ok) { alert('Ошибка загрузки данных'); return; }
+      if (!res.ok) { alert('Не удалось загрузить данные'); return; }
       state.rows = res.rows || [];
-      state.hasManager = state.rows.some(r => r && Object.prototype.hasOwnProperty.call(r, OPTIONAL_MANAGER_FIELD));
-      $('#f_status').innerHTML = FUNNEL_COLUMNS.map(s=>`<option>${s}</option>`).join('');
-      renderBoard();
-      $('#skeleton').classList.add('hidden'); $('#board').classList.remove('hidden');
+      renderBoard(); startLiveSync();
     }
 
-    (async function bootstrap(){
-      if (state.token) { showApp(true); renderSkeleton(); void loadData(); }
-      else { renderSkeleton(); showApp(false); }
-    })();
+    // Автозапуск
+    (async function bootstrap(){ if (state.token){ showApp(true); renderSkeleton(); void loadData(); } })();
   </script>
 </body>
 </html>
+
