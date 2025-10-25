@@ -144,15 +144,15 @@
       cols.forEach((col, idx)=>{
         const box = document.createElement('div'); box.className = 'bg-white border rounded-2xl p-3';
         const items = state.rows.filter(r=> String(r[effectiveStatusKey()]||'').trim()===col);
-        box.innerHTML = `
-          <div class="flex items-center justify_between mb-2">
-            <div class="font-semibold">${col}</div>
-            <div class="flex items-center gap-2">
-              ${idx===0? '<button class="addLead px-2 py-1 text-xs rounded-md bg-black text-white">\u041D\u043E\u0432\u044B\u0439 \u043B\u0438\u0434</button>':''}
-              <div class="text-xs text-slate-600 count">0</div>
-            </div>
-          </div>
-          <div class="col-drop space-y-2" data-status="${col}"></div>`;
+        box.innerHTML = '
+          <div class="flex items-center justify-between mb-2">'
+          + '<div class="font-semibold">'+col+'</div>'
+          + '<div class="flex items-center gap-2">'
+          + (idx===0? '<button class="addLead px-2 py-1 text-xs rounded-md bg-black text-white">\u041D\u043E\u0432\u044B\u0439 \u043B\u0438\u0434</button>' : '')
+          + '<div class="text-xs text-slate-600 count">0</div>'
+          + '</div>'
+          + '</div>'
+          + '<div class="col-drop space-y-2" data-status="'+col+'"></div>';
         const drop = box.querySelector('.col-drop');
         items.forEach(r=> drop.appendChild(renderCard(r)));
         const cnt = box.querySelector('.count'); if (cnt) cnt.textContent = String(items.length);
@@ -170,22 +170,22 @@
       const title = String(row[FIELD_TITLE]||'');
       const phone = String(row[FIELD_PHONE]||'');
       const price = String(row[FIELD_PRICE]||'');
-      card.innerHTML = `
-        <div class="flex items-start gap-2">
-          <div class="drag-handle sm:hidden -m-2 mr-1 px-1 py-2 w-6 shrink-0 self-stretch flex items-center justify-center text-slate-400 cursor-grab active:cursor-grabbing">
-            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9 5a1 1 0 1 1-2 0a1 1 0 0 1 2 0m0 14a1 1 0 1 1-2 0a1 1 0 0 1 2 0m0-7a1 1 0 1 1-2 0a1 1 0 0 1 2 0m8-7a1 1 0 1 1-2 0a1 1 0 0 1 2 0m0 14a1 1 0 1 1-2 0a1 1 0 0 1 2 0m0-7a1 1 0 1 1-2 0a1 1 0 0 1 2 0"/></svg>
-            <span class="sr-only">\u041F\u0435\u0440\u0435\u0442\u0430\u0449\u0438\u0442\u044C</span>
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center justify-between gap-2">
-              <div class="text-sm font-semibold line-clamp-2">${title}</div>
-              <div class="text-xs text-slate-600">$${price}</div>
-            </div>
-            <div class="mt-1 flex items-center justify-between text-xs text-slate-700">
-              <div class="truncate">${phone}</div>
-            </div>
-          </div>
-        </div>`;
+      card.innerHTML = ''
+        + '<div class="flex items-start gap-2">'
+        +   '<div class="drag-handle sm:hidden -m-2 mr-1 px-1 py-2 w-6 shrink-0 self-stretch flex items-center justify-center text-slate-400 cursor-grab active:cursor-grabbing">'
+        +     '<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9 5a1 1 0 1 1-2 0a1 1 0 0 1 2 0m0 14a1 1 0 1 1-2 0a1 1 0 0 1 2 0m0-7a1 1 0 1 1-2 0a1 1 0 0 1 2 0m8-7a1 1 0 1 1-2 0a1 1 0 0 1 2 0m0 14a1 1 0 1 1-2 0a1 1 0 0 1 2 0m0-7a1 1 0 1 1-2 0a1 1 0 0 1 2 0"/></svg>'
+        +     '<span class="sr-only">\u041F\u0435\u0440\u0435\u0442\u0430\u0449\u0438\u0442\u044C</span>'
+        +   '</div>'
+        +   '<div class="flex-1 min-w-0">'
+        +     '<div class="flex items-center justify-between gap-2">'
+        +       '<div class="text-sm font-semibold line-clamp-2">'+title+'</div>'
+        +       '<div class="text-xs text-slate-600">$'+price+'</div>'
+        +     '</div>'
+        +     '<div class="mt-1 flex items-center justify-between text-xs text-slate-700">'
+        +       '<div class="truncate">'+phone+'</div>'
+        +     '</div>'
+        +   '</div>'
+        + '</div>';
       const h = card.querySelector('.drag-handle'); if (h){ h.addEventListener('click', e=> e.stopPropagation()); }
       return card;
     }
@@ -237,4 +237,3 @@
   </script>
 </body>
 </html>
-
