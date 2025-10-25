@@ -144,8 +144,7 @@
       cols.forEach((col, idx)=>{
         const box = document.createElement('div'); box.className = 'bg-white border rounded-2xl p-3';
         const items = state.rows.filter(r=> String(r[effectiveStatusKey()]||'').trim()===col);
-        box.innerHTML = '
-          <div class="flex items-center justify-between mb-2">'
+        box.innerHTML = '<div class="flex items-center justify-between mb-2">'
           + '<div class="font-semibold">'+col+'</div>'
           + '<div class="flex items-center gap-2">'
           + (idx===0? '<button class="addLead px-2 py-1 text-xs rounded-md bg-black text-white">\u041D\u043E\u0432\u044B\u0439 \u043B\u0438\u0434</button>' : '')
