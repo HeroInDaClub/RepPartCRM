@@ -127,7 +127,7 @@
     function effectiveStatusKey(){ return state.statusKey || STATUS_FIELD; }
     function rowsVersion(rows){ const k = effectiveStatusKey(); return (rows||[]).map(r=> String(r && r.id)+'|'+String((r && r[k])||'')).join('~'); }
     function startLiveSync(){ stopLiveSync(); state.rowsVer = rowsVersion(state.rows||[]); state.liveTimer = setInterval(()=> tickLiveSync(false), LIVE_SYNC_MS); }
-    function stopLiveSync(){ try { if (state.liveTimer){ clearInterval(state.liveTimer); state.liveTimer=null; } } catch(_){ }
+    function stopLiveSync(){ try { if (state.liveTimer){ clearInterval(state.liveTimer); state.liveTimer=null; } } catch(_){ } }
     async function tickLiveSync(force){ if (!state.token) return; if (document.hidden && !force) return; if (DRAGGING) return; const res = await api('list', { token: state.token }); if (!res.ok) return; const next = res.rows || []; const ver = rowsVersion(next); if (ver !== state.rowsVer){ state.rows = next; renderBoard(); state.rowsVer = ver; } }
     let bc = null; try { if ('BroadcastChannel' in window){ bc = new BroadcastChannel('crm_sync'); bc.onmessage = (ev)=>{ const m=ev.data||{}; if (m.t==='status') applyIncomingStatus(m.id, m.status); }; } } catch(_){ }
     window.addEventListener('storage', (e)=>{ if (e.key==='crm_sync_msg' && e.newValue){ try { const m = JSON.parse(e.newValue); if (m && m.t==='status') applyIncomingStatus(m.id, m.status); } catch(_){} } });
